@@ -8,6 +8,8 @@
 #endif
 
 #include <Servo.h>
+#include "Settings.h"
+extern Settings currentSettings;
 
 class Interrupt
 {
@@ -16,6 +18,7 @@ class Interrupt
     static void init();
     static void setFrequency(int hz);
     static int getFrequency();
+    static void applySettings(Settings *settings);
 };
 
 #endif

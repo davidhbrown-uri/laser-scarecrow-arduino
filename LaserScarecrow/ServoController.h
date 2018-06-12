@@ -8,6 +8,8 @@
 #endif
 
 #include <Servo.h>
+#include "Settings.h"
+extern Settings currentSettings;
 
 class ServoController
 {
@@ -32,6 +34,7 @@ class ServoController
     static int getPulseTarget();
     static int getPulseRangeMin();
     static int getPulseRangeMax();
+    static void applySettings(Settings *settings);
 };
 
 #endif

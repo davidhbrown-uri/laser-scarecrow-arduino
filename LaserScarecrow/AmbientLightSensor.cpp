@@ -9,7 +9,7 @@ unsigned long AmbientLightSensor::_lastReadingMillis;
 
 void AmbientLightSensor::init()
 {
-  setThreshold(AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD);
+  applySettings(& currentSettings);
   pinMode(AMBIENTLIGHTSENSOR_PIN, INPUT);
   for (int i = 0; i < AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE; i++)
   {
@@ -70,5 +70,8 @@ int AmbientLightSensor::read()
 {
   return _average;
 }
-
+void AmbientLightSensor::applySettings(Settings *settings)
+{
+  _threshold = settings->light_sensor_threshold;
+}
 

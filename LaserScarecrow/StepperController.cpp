@@ -10,11 +10,11 @@ void StepperController::init()
   pinMode(STEPPER_PIN_SLEEP, OUTPUT);
   pinMode(STEPPER_PIN_STEP, OUTPUT);
   pinMode(STEPPER_PIN_DIR, OUTPUT);
-  pinMode(STEPPER_PIN_HALFSTEPPING, OUTPUT);
+  pinMode(STEPPER_PIN_MICROSTEP, OUTPUT);
   digitalWrite(STEPPER_PIN_SLEEP, LOW);
   digitalWrite(STEPPER_PIN_STEP, LOW);
   digitalWrite(STEPPER_PIN_DIR, LOW);
-  digitalWrite(STEPPER_PIN_HALFSTEPPING, LOW);
+  digitalWrite(STEPPER_PIN_MICROSTEP, LOW);
   stop();
   setStepsToStep(0);
 }
@@ -41,12 +41,12 @@ inline void StepperController::_wake()
 void StepperController::runFullstep()
 {
   _wake();
-  digitalWrite(STEPPER_PIN_HALFSTEPPING, LOW);
+  digitalWrite(STEPPER_PIN_MICROSTEP, LOW);
 }
 void StepperController::runHalfstep()
 {
   _wake();
-  digitalWrite(STEPPER_PIN_HALFSTEPPING, HIGH);
+  digitalWrite(STEPPER_PIN_MICROSTEP, HIGH);
 }
 
 
@@ -96,3 +96,4 @@ void StepperController::setStepsToStep(int steps)
 {
   _stepsToStep = steps;
 }
+
