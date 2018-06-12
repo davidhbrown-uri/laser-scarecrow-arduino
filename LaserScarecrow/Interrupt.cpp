@@ -5,6 +5,7 @@ int Interrupt::_frequency;
 
 void Interrupt::init()
 {
+  applySettings(&currentSettings);
   // initialize timer; define one INTERRUPTS_* timer (not multiple!) in config.h
 #ifdef INTERRUPTS_ATmega328P_T2
 #ifdef DEBUG_SERIAL
@@ -126,5 +127,9 @@ void Interrupt::setFrequency(int frequency)
 int Interrupt::getFrequency()
 {
   return _frequency;
+}
+void Interrupt::applySettings(Settings *settings)
+{
+  setFrequency(settings->interrupt_frequency);
 }
 

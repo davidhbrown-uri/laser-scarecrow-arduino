@@ -1,11 +1,17 @@
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.1.1 - slow servo, flicker laser, bimodal threshold")
+#define SOFTWARE_VERSION F("Version 1.2_4 - slow servo, flicker laser, bimodal threshold")
 
 /*******************
    VERSION HISTORY
  *******************
 
+  1.2_4 - June 2018 - branch feat/4_Settings
+  . Gather #defines used for Settings object
+    and categories others to find more easily
+  . rename STEPPER_PIN_HALFSTEPPING STEPPER_PIN_MICROSTEP
+    because microstep pins can be selected with jumpers on 2018 boards
+  
   1.1.1 - May 28 2018
   . Minor clean-up for github initial release
 
@@ -31,36 +37,14 @@
   . used Pro Mini
 */
 
-// use 8-bit timer 2 for ATmega328 (UNO, Pro Mini)
-// # define INTERRUPTS_ATmega328P_T2
-// use timer 1 or 3 for ATmega32u4 (Leonardo, Micro)
-// actually might need to use timer 3 to avoid conflict with servo library on Timer 1
-// # define INTERRUPTS_ATmega32U4_T1
-#define INTERRUPTS_ATmega32U4_T3
 
-// Pin assignments April 2017 for
-// Arduino Pro Micro (Sparkfun design)
+/****************************
+ * Default behavior configuration
+ */
 
-#define RTC_PIN_SDA 2
-#define RTC_PIN_SCL 3
-
-#define KNOB1_PIN A1
-#define KNOB2_PIN A2
-#define KNOB3_PIN A3
-
-#define LASER_PIN_POWER 14
-
-
-//on the cheap knockoffs, the LEDs are illuminated when the pin is low
-#define LED1_PIN LED_BUILTIN_RX
-#define LED1_INVERT true
-#define LED2_PIN LED_BUILTIN_TX
-#define LED2_INVERT true
-
-#define LOOP_PROCESS_RATE 50
-#define LOOP_SERIAL_OUTPUT_RATE 2000
-#define LOOPLED_RATE 1500
-
+#define STEPPER_RANDOMSTEPS_MIN -70
+#define STEPPER_RANDOMSTEPS_MAX 100
+#define STEPPER_STEPS_WHILE_SEEKING 17
 /* Ambient lux levels measured by ColorMunki -> threshold values
     Per https://en.wikipedia.org/wiki/Lux dark limit of twilight is 3.4 lux
      3 lux => 28~30  // office during thunderstorm 3pm
@@ -72,37 +56,24 @@
     130 lux => 270
 */
 #define AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD 250
-#define AMBIENTLIGHTSENSOR_PIN A0
-#define AMBIENTLIGHTSENSOR_READ_INTERVAL_MS 2000
-#define AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE 8
+// Values for the servo that wiggles the laser up and down
+// The angle set will range from LOW to HIGH+WIGGLE
+// A new angle will be set at random every SERVO_HOLD_TIME_MS ms
+#define SERVO_HOLD_TIME_MS 500
+//#define SERVO_ANGLE_LOW_LIMIT 90
+//#define SERVO_ANGLE_HIGH_LIMIT 170
+// wiggle was 6
+#define SERVO_ANGLE_WIGGLE 3
+// speed must not be > 255 - SERVO_ANGLE_HIGH or possible byte overflow error
+#define SERVO_ANGLE_SPEED 20
+#define SERVO_ANGLE_DWELL_TIME 2500L
 
+/****************************
+ * Hardware Configuration
+ */
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
 #define LASER_DUTYCYCLERUNTIME 1800000
 #define LASER_DUTYCYCLECOOLDOWN 300000
-#define LASER_TOGGLE_WITH_INTERRUPT
-
-//The stepper must be controlled via an Allegro A4988
-//driver such as https://www.pololu.com/product/1182
-//(Don't forget the 100uF electrolytic between VMot and its ground!)
-
-#define STEPPER_PIN_HALFSTEPPING 6
-#define STEPPER_PIN_SLEEP 7
-#define STEPPER_PIN_STEP 8
-#define STEPPER_PIN_DIR 9
-
-// had been 0x3f
-#define STEPPER_POSTSCALE_MASK 0x02
-// had been 0x1f
-#define STEPPER_POSTSCALE_MASK_SEEKING 0x00
-#define STEPPER_RANDOMSTEPS_MIN -70
-#define STEPPER_RANDOMSTEPS_MAX 100
-#define STEPPER_SEEKSTEPS 15
-#define STEPPER_FULLSTEPS_PER_ROTATION 200
-
-// Values for the servo that wiggles the laser up and down
-// The angle set will range from LOW to HIGH+WIGGLE
-// A new angle will be set at random every DWELL_TIME ms
-#define SERVO_PIN_PULSE 16
 // the ms ranges should be determined for each model of servo used
 // MG90s purchased in 2017: control range apx 0.7ms (700µs) to 2.3ms
 // 1ms to 2ms resulted in 90-degree movement
@@ -114,49 +85,119 @@
 #define SERVO_PULSE_USABLE_MIN 1000
 #define SERVO_PULSE_USABLE_MAX 2000
 #define SERVO_PULSE_DELTA_LIMIT 5
-
-#define SERVO_HOLD_TIME_MS 500
-
-//#define SERVO_ANGLE_LOW_LIMIT 90
-//#define SERVO_ANGLE_HIGH_LIMIT 170
-// wiggle was 6
-#define SERVO_ANGLE_WIGGLE 3
-// speed must not be > 255 - SERVO_ANGLE_HIGH or possible byte overflow error
-#define SERVO_ANGLE_SPEED 20
-#define SERVO_ANGLE_DWELL_TIME 2500L
+#define STEPPER_FULLSTEPS_PER_ROTATION 200
 #define SERVO_POSTSCALE_MASK 0x0f
 #define SERVO_POSTSCALE_MASK_SEEKING 0xFF
-
-#define IR_REFLECTANCE_MINIMUM_CONTRAST 16
-// IR Reflectance readings are done at half speed, so reading * step per read should equal 400 (200 if done at full speed)
+// had been 0x3f
+#define STEPPER_POSTSCALE_MASK 0x02
+// had been 0x1f
+#define STEPPER_POSTSCALE_MASK_SEEKING 0x00
+#define STEPPER_STEPS_PER_REVOLUTION 200
+#define STEPPER_MICROSTEPPING_DIVISOR 2
+// IR Reflectance readings are done during microstepping, so readings * step per read should equal 400 (200 if done at full speed)
+//in testing black tape on white bucket, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
 #define IR_REFLECTANCE_READINGS 100
-#define IR_REFLECTANCE_STEPS_PER_READ 4
-//in testing, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
-//
+#define IR_REFLECTANCE_STEPS_PER_READ STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR / IR_REFLECTANCE_READINGS
+//these 2017 values for black tape on white bucket:
 #define IR_REFLECTANCE_MID_READ_LIMIT 10
 #define IR_REFLECTANCE_DEFAULT_PRESENT 550
 #define IR_REFLECTANCE_DEFAULT_ABSENT 400
-#define IR_REFLECTANCE_PIN A10
-//an out-of-range threshold value to ensure IR reflectance never is used
-#define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
-
-//when seeking, the system will make
+#define IR_REFLECTANCE_MINIMUM_CONTRAST 16
+//when seeking for the tape, the system will make
 //at most this many full rotations; if
 //tape is not found within that time,
-//it will reenter initialization.
+//it will ignore reflectance and operate full-circle.
 #define SEEKING_ROTATION_LIMIT 2
 
+
+/***************************
+ * Miscellaneous behavior defines
+ * ...could be Settings, but would probably be confusing
+ */
+#define AMBIENTLIGHTSENSOR_READ_INTERVAL_MS 2000
+#define LOOP_PROCESS_RATE 50
+#define LOOP_SERIAL_OUTPUT_RATE 2000
+#define LOOPLED_RATE 1500
+//an out-of-range threshold value to ensure IR reflectance never is used
+#define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
+// flash or steady
+#define LASER_TOGGLE_WITH_INTERRUPT
+#define INTERRUPT_FREQUENCY_MIN 20
+#define INTERRUPT_FREQUENCY_MAX 150
+#define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 5
+#define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
+
+/*************
+ * Software configuration
+ */
+// an array has to be allocated based on AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE, so maybe not a setting?
+#define AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE 8
+#define INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE 5
+
+
+/***********************
+ * Arduino / pin assignments
+ * 
+ ********************/
+
+// use 8-bit timer 2 for ATmega328 (UNO, Pro Mini)
+// # define INTERRUPTS_ATmega328P_T2
+// use timer 1 or 3 for ATmega32u4 (Leonardo, Micro)
+// actually might need to use timer 3 to avoid conflict with servo library on Timer 1
+// # define INTERRUPTS_ATmega32U4_T1
+#define INTERRUPTS_ATmega32U4_T3
+
+// Pin assignments valid April 2017 through at least June 2018 
+// for Arduino Pro Micro (Sparkfun design)
+
+#define AMBIENTLIGHTSENSOR_PIN A0
+#define KNOB1_PIN A1
+#define KNOB2_PIN A2
+#define KNOB3_PIN A3
+
+#define IR_REFLECTANCE_PIN A10
+
+// Bluetooth is on Serial1 at pins 0/1
+
+#define RTC_PIN_SDA 2
+#define RTC_PIN_SCL 3
+
+//The stepper must be controlled via an Allegro A4988
+//driver such as https://www.pololu.com/product/1182
+//(Don't forget the 100uF electrolytic between VMot and its ground!)
+#define STEPPER_PIN_MICROSTEP 6
+#define STEPPER_PIN_SLEEP 7
+#define STEPPER_PIN_STEP 8
+#define STEPPER_PIN_DIR 9
+
+#define LASER_PIN_POWER 14
+
+#define SERVO_PIN_PULSE 16
+
+
+//on the cheap knockoffs, the LEDs are illuminated when the pin is low
+#define LED1_PIN LED_BUILTIN_RX
+#define LED1_INVERT true
+#define LED2_PIN LED_BUILTIN_TX
+#define LED2_INVERT true
+
+
+/***************************
+ * DEBUG Flags
+ */
 #define DEBUG_SERIAL
 #define DEBUG_SERIAL_DATARATE 57600
-#define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 2000
+#define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 4000
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 5
 #define DEBUG_SERVO
 #define DEBUG_KNOBS
 #define DEBUG_LIGHTSENSOR
-#define DEBUG_REFLECTANCE
+//#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
+#define DEBUG_SETTINGS
 
-#define DEBUG_STEPPER
+//#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS
-#define DEBUG_LASERCONTROLLER
+//#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 #define DEBUG_INTERRUPT_FREQUENCY
