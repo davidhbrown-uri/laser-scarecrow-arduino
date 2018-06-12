@@ -1,5 +1,4 @@
 #include "config.h"
-
 #ifndef _STEPPERCONTROLLER_h
 #define _STEPPERCONTROLLER_h
 
@@ -8,7 +7,6 @@
 #else
 #include "WProgram.h"
 #endif
-
 
 class StepperController
 {

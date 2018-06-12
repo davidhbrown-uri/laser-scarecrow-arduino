@@ -17,6 +17,8 @@ unsigned int ServoController::_runningState;
 
 void ServoController::init() {
   Servo _servo;
+  
+  applySettings(& currentSettings);
 
   _pulse = (SERVO_PULSE_USABLE_MIN + SERVO_PULSE_USABLE_MAX ) / 2;
   _pulseTarget = _pulse;
@@ -105,5 +107,10 @@ int ServoController::getPulseRangeMin() {
 }
 int ServoController::getPulseRangeMax() {
   return _pulseRangeMax;
+}
+void ServoController::applySettings(Settings *settings)
+{
+  _pulseRangeMin = settings->servo_min;
+  _pulseRangeMax = settings->servo_max;
 }
 

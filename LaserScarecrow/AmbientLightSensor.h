@@ -17,6 +17,9 @@
 #include "WProgram.h"
 #endif
 
+#include "Settings.h"
+extern Settings currentSettings;
+
 class AmbientLightSensor
 {
     static int _threshold, _average, _readingsIndex;
@@ -27,6 +30,7 @@ class AmbientLightSensor
     static void update();
     static int read();
     static void setThreshold(int value);
+    static void applySettings(Settings *settings);
     static bool isDark();
     static bool isLight();
 };
