@@ -7,6 +7,8 @@
 #include "AmbientLightSensor.h"
 #include "IrReflectanceSensor.h"
 #include "LaserController.h"
+#include "Command.h"
+#include "CommandProcessor.h"
 
 // definitions for finite state machine
 #define STATE_INIT 0
@@ -38,6 +40,8 @@ unsigned long loopLastAimStatus = 0L;
 
 */
 Settings currentSettings;
+Command uCommand, btCommand;
+CommandProcessor uProcessor, btProcessor;
 
 void setup() {
   // put your setup code here, to run once:
@@ -57,15 +61,56 @@ void setup() {
   digitalWrite(LED1_PIN, LED1_INVERT);
   digitalWrite(LED2_PIN, LED2_INVERT);
 
+  /*********************
+   * Settings, Configuration, and command processors
+   */
+   currentSettings.init();
+
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  COMMAND_PROCESSOR_STREAM_USB.begin(COMMAND_PROCESSOR_DATARATE_USB);
+  uCommand.init();
+  uProcessor.setCommand(&uCommand);
+  uProcessor.setSettings(&currentSettings);
+//future:  uProcessor.setConfiguration(&configuration);
+//future:  uProcessor.setRTC(&rtc);
+  uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  // pinMode(BT_PIN_STATE, INPUT);// Should be high when connected, low when not
+  pinMode(BT_PIN_RXD, INPUT); // is this going to be handled by Serial1.begin?
+  pinMode(BT_PIN_TXD, OUTPUT);// is this going to be handled by Serial1.begin?
+  COMMAND_PROCESSOR_STREAM_BLUETOOTH.begin(COMMAND_PROCESSOR_DATARATE_BLUETOOTH);
+  btCommand.init();
+  btProcessor.setCommand(&btCommand);
+  btProcessor.setSettings(&currentSettings);
+//future:  btProcessor.setConfiguration(&configuration);
+//future:  btProcessor.setRTC(&rtc);
+  btProcessor.setStream(& COMMAND_PROCESSOR_STREAM_BLUETOOTH);
+#endif   
+  /********************************
+   * Initialize state machine for loop
+   */
   stateCurrent = STATE_POWERON;
   statePrevious = stateCurrent;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+        /*@todo figure out if we should leave the command processing here outside of state 
+       * or move it into what would have to be multiple states: ACTIVE, SEEKING, and SLEEP for sure.
+       * Probably also any future "configuration" state that might be entered on BT connection.
+       */
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  uProcessor.process();
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  btProcessor.process();
+#endif
+
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug) loopLastSerial = millis();
+
 #endif // DEBUG_SERIAL
   /*
     Simple Finite State Machine: arrange each switch case as follows...
@@ -85,7 +130,6 @@ void loop() {
     break;
   */
   switch (stateCurrent) {
-
     case STATE_POWERON:
       currentSettings.init();
       for (int i = 0; i < INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE; i++)
