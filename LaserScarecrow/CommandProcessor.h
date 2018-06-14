@@ -1,3 +1,11 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 /**
    A command processor aggregates a Command and a Configuration, handling things
    that need to know about both so they can each focus on their own

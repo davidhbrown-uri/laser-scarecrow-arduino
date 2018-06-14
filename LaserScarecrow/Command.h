@@ -1,4 +1,12 @@
 /*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
+/*
    Command.h - library for processing a text command
    Created by David H. Brown, February 19, 2018
    License TBD

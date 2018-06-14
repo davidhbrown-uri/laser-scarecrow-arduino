@@ -1,9 +1,15 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 /**
    A Settings stores the behavior settings of the Laser Scarecrow
    It really isn't much more than a struct, so its properties are public
    Created by David H. Brown, February 25, 2018
-   License TBD
-   Part of the URI Laser Scarecrow project
 
    In classes that need to access the current settings, put the following near the top:
   #include "Settings.h"
@@ -30,11 +36,11 @@ class Settings {
   public:
     Settings();
     void init();
-//#ifdef DEBUG_SERIAL
-//#ifdef DEBUG_SETTINGS
+    //#ifdef DEBUG_SERIAL
+    //#ifdef DEBUG_SETTINGS
     void printToStream(Stream *st);
-//#endif
-//#endif
+    //#endif
+    //#endif
     //properties
     int stepper_randomsteps_min; //done but no control implemented
     int stepper_randomsteps_max; //done but no control implemented

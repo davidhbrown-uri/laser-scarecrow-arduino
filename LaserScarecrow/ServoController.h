@@ -1,3 +1,11 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 #ifndef _SERVOCONTROLLER_h
 #define _SERVOCONTROLLER_h
 
@@ -21,7 +29,7 @@ class ServoController
     static volatile int _pulseRangeMin;
     static volatile int _pulseRangeMax;
     static unsigned long _millisBeginHold;
-    static unsigned int _holdTimeMillis;
+    static int _holdTimeMillis;
   static unsigned int _runningState; public:
     static void init();
     static void update();
@@ -29,7 +37,7 @@ class ServoController
     static void run();
     static bool isRunning();
     static void setPulseRange(int low, int high);
-    static void setHoldTime(unsigned int ms);
+    static void setHoldTime(int ms);
     static int getPulse();
     static int getPulseTarget();
     static int getPulseRangeMin();

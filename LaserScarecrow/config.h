@@ -1,11 +1,23 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.2_4 - slow servo, flicker laser, bimodal threshold")
+#define SOFTWARE_VERSION F("Version 1.2_8 - def - feat/8")
 
 /*******************
    VERSION HISTORY
  *******************
 
+  1.2_8 - June 2018 - branch feat/8_Command
+  . allow commands from Serial (USB) and Serial1 (Bluetooth)
+    to change settings
+    
   1.2_4 - June 2018 - branch feat/4_Settings
   . Gather #defines used for Settings object
     and categories others to find more easily
@@ -207,6 +219,7 @@
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
 #define DEBUG_SETTINGS
+#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS

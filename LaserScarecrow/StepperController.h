@@ -1,3 +1,11 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 #include "config.h"
 #ifndef _STEPPERCONTROLLER_h
 #define _STEPPERCONTROLLER_h

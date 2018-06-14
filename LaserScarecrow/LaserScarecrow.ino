@@ -1,3 +1,10 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
 #include "config.h"
 #include "Settings.h"
 #include "Interrupt.h"
@@ -9,6 +16,7 @@
 #include "LaserController.h"
 #include "Command.h"
 #include "CommandProcessor.h"
+#include "SettingsObserver.h"
 
 // definitions for finite state machine
 #define STATE_INIT 0
@@ -65,6 +73,7 @@ void setup() {
    * Settings, Configuration, and command processors
    */
    currentSettings.init();
+   SettingsObserver::init();
 
 #ifdef COMMAND_PROCESSOR_ENABLE_USB
   COMMAND_PROCESSOR_STREAM_USB.begin(COMMAND_PROCESSOR_DATARATE_USB);
@@ -106,7 +115,8 @@ void loop() {
 #ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
   btProcessor.process();
 #endif
-
+  SettingsObserver::process(); // apply any changes to settings
+  
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug) loopLastSerial = millis();
@@ -399,7 +409,7 @@ void setInterruptSpeed()
 #endif
 #endif
     currentSettings.interrupt_frequency = newFrequency;
-    Interrupt::applySettings(& currentSettings);
+    //let SettingsObserver do this: Interrupt::applySettings(& currentSettings);
   }
 }
 void setServoRange()
@@ -411,7 +421,7 @@ void setServoRange()
   {
     currentSettings.servo_min = pulseLow;
     currentSettings.servo_max = pulseHigh;
-    ServoController::applySettings(& currentSettings);
+    //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
   }
 }
 
