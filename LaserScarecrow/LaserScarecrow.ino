@@ -14,6 +14,7 @@
 #include "AmbientLightSensor.h"
 #include "IrReflectanceSensor.h"
 #include "LaserController.h"
+#include "AnalogInput.h"
 #include "Command.h"
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
@@ -51,6 +52,8 @@ Settings currentSettings;
 Command uCommand, btCommand;
 CommandProcessor uProcessor, btProcessor;
 
+AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
+
 void setup() {
   // put your setup code here, to run once:
 
@@ -59,9 +62,9 @@ void setup() {
   */
 
   // Knobs
-  pinMode(KNOB1_PIN, INPUT);
-  pinMode(KNOB2_PIN, INPUT);
-  pinMode(KNOB3_PIN, INPUT);
+  knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
+  knobAngleMin.begin(KNOB2_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
+  knobAngleRange.begin(KNOB3_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
 
   // pending LedController
   pinMode(LED1_PIN, OUTPUT);
@@ -386,39 +389,30 @@ ISR(TIMER3_COMPA_vect)
 
 void setInterruptSpeed()
 {
-  //don't do this constantly or it really messes up the timing!
-  static byte readingIndex = 0;
-  interruptKnobReadings[readingIndex] = map(analogRead(KNOB1_PIN), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
-  readingIndex = ++readingIndex % INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE;
-  int newFrequency = 0;
-  for (int i = 0; i < INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE; i++)
+  knobSpeed.process();
+  if (knobSpeed.hasNewValue())
   {
-    newFrequency += interruptKnobReadings[i];
-  }
-  newFrequency  /= INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE;
-  if (abs(currentSettings.interrupt_frequency - newFrequency) > INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD)
-  {
+    currentSettings.interrupt_frequency = map(knobSpeed.getValue(), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+    knobSpeed.acknowledgeNewValue();
+    // Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_INTERRUPT_FREQUENCY
-    Serial.print(F("\n\r+++Changing frequency via knob. Old freq = "));
+    Serial.print(F("\n\r+++Changing frequency via knob. New freq = "));
     Serial.print(currentSettings.interrupt_frequency);
-    Serial.print(F("; new freq = "));
-    Serial.print(newFrequency);
-    Serial.print(F("; threshold for change = "));
-    Serial.println(INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
 #endif
 #endif
-    currentSettings.interrupt_frequency = newFrequency;
-    //let SettingsObserver do this: Interrupt::applySettings(& currentSettings);
   }
 }
 void setServoRange()
 {
-  int pulseLow = map(analogRead(KNOB2_PIN), 0, 1023, SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
-  int pulseHigh = map(analogRead(KNOB3_PIN), 0, 1023, pulseLow, SERVO_PULSE_USABLE_MAX);
-
-  if (abs(pulseLow - currentSettings.servo_min) > SERVO_PULSE_KNOB_CHANGE_THRESHOLD || abs(pulseHigh - currentSettings.servo_max) > SERVO_PULSE_KNOB_CHANGE_THRESHOLD)
+  knobAngleMin.process();
+  knobAngleRange.process();
+  if (knobAngleMin.hasNewValue() || knobAngleRange.hasNewValue())
   {
+    knobAngleMin.acknowledgeNewValue();
+    knobAngleRange.acknowledgeNewValue();
+    int pulseLow = map(knobAngleMin.getValue(), 0, 1023, SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
+    int pulseHigh = map(knobAngleRange.getValue(), 0, 1023, pulseLow, SERVO_PULSE_USABLE_MAX);
     currentSettings.servo_min = pulseLow;
     currentSettings.servo_max = pulseHigh;
     //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
