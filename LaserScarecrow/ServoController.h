@@ -4,8 +4,8 @@
    Part of the URI Laser Scarecrow project
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
- */
- 
+*/
+
 #ifndef _SERVOCONTROLLER_h
 #define _SERVOCONTROLLER_h
 
@@ -29,7 +29,7 @@ class ServoController
     static volatile int _pulseRangeMin;
     static volatile int _pulseRangeMax;
     static unsigned long _millisBeginHold;
-    static int _holdTimeMillis;
+    static unsigned int _holdTimeMillis;
   static unsigned int _runningState; public:
     static void init();
     static void update();
