@@ -35,11 +35,17 @@ AnalogInput::AnalogInput(byte pin, byte numReadings, unsigned int ms, int change
 }
 void AnalogInput::process()
 {
-  if (_lastReadMillis + _msBetweenReads < millis())
+  if (millis() - _lastReadMillis >= _msBetweenReads)
   {
-    _lastReadMillis = millis();
     _readings[_readIndex++] = analogRead(_pin);
     _readIndex %= _numReadings;
+    _lastReadMillis = millis();
+    /* 
+     *  _lastReadMillis = millis();//caution: possible timing drift probably don't care, but...
+     * @todo consider alternate approach of _lastReadMillis += _msBetweenReads; 
+     * Could this cause a race condition if the loop took a lot more time
+     * than _msBetweenReads ? @link https://playground.arduino.cc/Code/TimingRollover
+     */
     unsigned long sum = 0L;
     for (byte i = 0; i < _numReadings; i++)
     {
