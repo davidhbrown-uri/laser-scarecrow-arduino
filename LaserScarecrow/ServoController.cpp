@@ -1,3 +1,11 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 #include "ServoController.h"
 #include "config.h"
 #include <Servo.h>
@@ -17,6 +25,8 @@ unsigned int ServoController::_runningState;
 
 void ServoController::init() {
   Servo _servo;
+  
+  applySettings(& currentSettings);
 
   _pulse = (SERVO_PULSE_USABLE_MIN + SERVO_PULSE_USABLE_MAX ) / 2;
   _pulseTarget = _pulse;
@@ -85,9 +95,9 @@ void ServoController::setPulseRange(int low, int high)
   if (_pulseRangeMax > SERVO_PULSE_SAFETY_MAX) _pulseRangeMax = SERVO_PULSE_SAFETY_MAX;
 }
 
-void ServoController::setHoldTime(unsigned int ms)
+void ServoController::setHoldTime(int ms)
 {
-  _holdTimeMillis = ms;
+  _holdTimeMillis = max(0,ms);
 }
 
 bool ServoController::isRunning() {
@@ -105,5 +115,9 @@ int ServoController::getPulseRangeMin() {
 }
 int ServoController::getPulseRangeMax() {
   return _pulseRangeMax;
+}
+void ServoController::applySettings(Settings *settings)
+{
+  setPulseRange(settings->servo_min, settings->servo_max);
 }
 

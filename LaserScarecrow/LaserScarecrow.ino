@@ -1,4 +1,12 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
 #include "config.h"
+#include "Settings.h"
 #include "Interrupt.h"
 #include "StepperController.h"
 #include "ServoController.h"
@@ -6,6 +14,10 @@
 #include "AmbientLightSensor.h"
 #include "IrReflectanceSensor.h"
 #include "LaserController.h"
+#include "AnalogInput.h"
+#include "Command.h"
+#include "CommandProcessor.h"
+#include "SettingsObserver.h"
 
 // definitions for finite state machine
 #define STATE_INIT 0
@@ -19,7 +31,8 @@ byte stateCurrent, statePrevious;
 unsigned long loopLedLastChangeMillis = 0L;
 unsigned long loopProcessLastMillis = 0L;
 unsigned long loopLastSerial = 0L;
-int seekingRotationLimit;
+int seekingRotationLimitCountdown;
+int interruptKnobReadings[INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE] ;
 
 #ifdef DEBUG_AIMCONTROLLER
 #ifdef DEBUG_SERIAL
@@ -27,41 +40,90 @@ unsigned long aimStatusCycle = LOOP_SERIAL_OUTPUT_RATE / 80L;
 unsigned long loopLastAimStatus = 0L;
 #endif
 #endif
+
+/*
+      In classes that need to access the current settings, put the following near the top:
+
+  #include "Settings.h"
+  extern Settings currentSettings;
+
+*/
+Settings currentSettings;
+Command uCommand, btCommand;
+CommandProcessor uProcessor, btProcessor;
+
+AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
+
 void setup() {
   // put your setup code here, to run once:
-  stateCurrent = STATE_POWERON;
-#ifdef DEBUG_SERIAL
-  Serial.begin(DEBUG_SERIAL_DATARATE);
-  Serial.println();
-  delay(1000);
-  for (int i = 3; i >= 0; i--) {
-    Serial.print(F("Laser Scarecrow Startup in "));
-    Serial.print(i);
-    Serial.println(F("..."));
-    delay(1000);
-  }
-#endif // DEBUG_SERIAL
 
   /*************************
      INITIALIZE I/O pins
   */
 
   // Knobs
-  pinMode(KNOB1_PIN, INPUT);
-  pinMode(KNOB2_PIN, INPUT);
-  pinMode(KNOB3_PIN, INPUT);
+  knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
+  knobAngleMin.begin(KNOB2_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
+  knobAngleRange.begin(KNOB3_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
 
+  // pending LedController
   pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  digitalWrite(LED1_PIN, LED1_INVERT);
+  digitalWrite(LED2_PIN, LED2_INVERT);
 
+  /*********************
+   * Settings, Configuration, and command processors
+   */
+   currentSettings.init();
+   SettingsObserver::init();
+
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  COMMAND_PROCESSOR_STREAM_USB.begin(COMMAND_PROCESSOR_DATARATE_USB);
+  uCommand.init();
+  uProcessor.setCommand(&uCommand);
+  uProcessor.setSettings(&currentSettings);
+//future:  uProcessor.setConfiguration(&configuration);
+//future:  uProcessor.setRTC(&rtc);
+  uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  // pinMode(BT_PIN_STATE, INPUT);// Should be high when connected, low when not
+  pinMode(BT_PIN_RXD, INPUT); // is this going to be handled by Serial1.begin?
+  pinMode(BT_PIN_TXD, OUTPUT);// is this going to be handled by Serial1.begin?
+  COMMAND_PROCESSOR_STREAM_BLUETOOTH.begin(COMMAND_PROCESSOR_DATARATE_BLUETOOTH);
+  btCommand.init();
+  btProcessor.setCommand(&btCommand);
+  btProcessor.setSettings(&currentSettings);
+//future:  btProcessor.setConfiguration(&configuration);
+//future:  btProcessor.setRTC(&rtc);
+  btProcessor.setStream(& COMMAND_PROCESSOR_STREAM_BLUETOOTH);
+#endif   
+  /********************************
+   * Initialize state machine for loop
+   */
+  stateCurrent = STATE_POWERON;
   statePrevious = stateCurrent;
-  stateCurrent = STATE_INIT;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+        /*@todo figure out if we should leave the command processing here outside of state 
+       * or move it into what would have to be multiple states: ACTIVE, SEEKING, and SLEEP for sure.
+       * Probably also any future "configuration" state that might be entered on BT connection.
+       */
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  uProcessor.process();
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  btProcessor.process();
+#endif
+  SettingsObserver::process(); // apply any changes to settings
+  
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug) loopLastSerial = millis();
+
 #endif // DEBUG_SERIAL
   /*
     Simple Finite State Machine: arrange each switch case as follows...
@@ -81,6 +143,26 @@ void loop() {
     break;
   */
   switch (stateCurrent) {
+    case STATE_POWERON:
+      currentSettings.init();
+      for (int i = 0; i < INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE; i++)
+      {
+        interruptKnobReadings[i] = currentSettings.interrupt_frequency;
+      }
+      StepperController::init();
+      StepperController::stop();
+#ifdef DEBUG_SERIAL
+      Serial.begin(DEBUG_SERIAL_DATARATE);
+      Serial.println();
+      for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--) {
+        Serial.print(F("Laser Scarecrow Startup in "));
+        Serial.print(i);
+        Serial.println(F("..."));
+        delay(1000);
+      }
+#endif // DEBUG_SERIAL
+      stateCurrent = STATE_INIT;
+      break;
 
     case STATE_INIT:
       if (stateCurrent != statePrevious) {
@@ -89,11 +171,6 @@ void loop() {
 #ifdef DEBUG_SERIAL
         Serial.println(F("\r\n[[Entering INIT State]]"));
 #endif // DEBUG_SERIAL
-        // pending LedController
-        pinMode(LED1_PIN, OUTPUT);
-        pinMode(LED2_PIN, OUTPUT);
-        digitalWrite(LED1_PIN, LED1_INVERT);
-        digitalWrite(LED2_PIN, LED2_INVERT);
         LaserController::init();
         ServoController::init();
         StepperController::init();
@@ -120,7 +197,9 @@ void loop() {
         LaserController::turnOn();
         ServoController::run();
         StepperController::runHalfstep();
-        StepperController::setStepsToStepRandom(STEPPER_RANDOMSTEPS_MIN, STEPPER_RANDOMSTEPS_MAX);
+        StepperController::setStepsToStepRandom(
+          currentSettings.stepper_randomsteps_min,
+          currentSettings.stepper_randomsteps_max);
       }
       //update:
       // check for transition events (later checks have priority)
@@ -136,7 +215,7 @@ void loop() {
       }
       break;
     case STATE_SEEKING:
-      if (stateCurrent != statePrevious) {
+      if (stateCurrent != statePrevious) { // onEntry
         statePrevious = stateCurrent;
 #ifdef DEBUG_SERIAL
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
@@ -144,19 +223,22 @@ void loop() {
         LaserController::turnOff();
         ServoController::stop();
         StepperController::runFullstep();
-        StepperController::setStepsToStep(STEPPER_FULLSTEPS_PER_ROTATION);
-        seekingRotationLimit = SEEKING_ROTATION_LIMIT;
+        StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
+        seekingRotationLimitCountdown = SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
       }
       //update:
       //check for transition
-      if (IrReflectanceSensor::isAbsent()) stateCurrent = STATE_ACTIVE;
+      if (IrReflectanceSensor::isAbsent())
+      {
+        stateCurrent = STATE_ACTIVE;
+      }
       //do our things:
       if (StepperController::getStepsToStep() == 0)
       {
-        StepperController::setStepsToStep(STEPPER_FULLSTEPS_PER_ROTATION);
-        seekingRotationLimit--;
+        StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
+        seekingRotationLimitCountdown--;
       }
-      if (seekingRotationLimit == 0)
+      if (seekingRotationLimitCountdown == 0)
       {
         stateCurrent = STATE_INIT;
       }
@@ -186,7 +268,7 @@ void loop() {
       if (stateCurrent != statePrevious) {
         //exit code:
         // return the interrupt speed back to user-defined
-        setInterruptSpeed();
+        Interrupt::applySettings(& currentSettings);
       }
       break;
     case STATE_COOLDOWN:
@@ -211,7 +293,7 @@ void loop() {
       if (stateCurrent != statePrevious) {
         //exit code:
         // return the interrupt speed back to user-defined
-        setInterruptSpeed();
+        Interrupt::applySettings(& currentSettings);
       }
       break;
   }
@@ -225,6 +307,9 @@ void loop() {
   {
     Serial.println();
     Serial.print(SOFTWARE_VERSION);
+#ifdef DEBUG_SETTINGS
+    currentSettings.printToStream(&Serial);
+#endif
 #ifdef DEBUG_REFLECTANCE
     Serial.print(F("IR raw="));
     Serial.print(IrReflectanceSensor::read());
@@ -301,23 +386,37 @@ ISR(TIMER3_COMPA_vect)
    Helper functions
    Put things here that require access to multuple modules
 */
+
 void setInterruptSpeed()
 {
-  //don't do this constantly or it really messes up the timing!
-  int newFequency = 12 + analogRead(KNOB1_PIN) / 8;
-  if (abs(Interrupt::getFrequency() - newFequency) > 4)
+  knobSpeed.process();
+  if (knobSpeed.hasNewValue())
   {
-    Interrupt::setFrequency(newFequency);
+    currentSettings.interrupt_frequency = map(knobSpeed.getValue(), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+    knobSpeed.acknowledgeNewValue();
+    // Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_INTERRUPT_FREQUENCY
+    Serial.print(F("\n\r+++Changing frequency via knob. New freq = "));
+    Serial.print(currentSettings.interrupt_frequency);
+#endif
+#endif
   }
 }
 void setServoRange()
 {
-  int knob2 = analogRead(KNOB2_PIN);
-  int knob3 = analogRead(KNOB3_PIN);
-
-  int pulseLow = map(knob2, 0, 1023, SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
-  int pulseHigh = map(knob3, 0, 1023, pulseLow, SERVO_PULSE_USABLE_MAX);
-  ServoController::setPulseRange(pulseLow, pulseHigh);
+  knobAngleMin.process();
+  knobAngleRange.process();
+  if (knobAngleMin.hasNewValue() || knobAngleRange.hasNewValue())
+  {
+    knobAngleMin.acknowledgeNewValue();
+    knobAngleRange.acknowledgeNewValue();
+    int pulseLow = map(knobAngleMin.getValue(), 0, 1023, SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
+    int pulseHigh = map(knobAngleRange.getValue(), 0, 1023, pulseLow, SERVO_PULSE_USABLE_MAX);
+    currentSettings.servo_min = pulseLow;
+    currentSettings.servo_max = pulseHigh;
+    //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
+  }
 }
 
 // Version 1.1 attempts to find bimodal peaks and extents:
