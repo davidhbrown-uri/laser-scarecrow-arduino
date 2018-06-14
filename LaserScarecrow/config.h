@@ -1,11 +1,23 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.2_4 - slow servo, flicker laser, bimodal threshold")
+#define SOFTWARE_VERSION F("Version 1.2_8 - def - feat/8")
 
 /*******************
    VERSION HISTORY
  *******************
 
+  1.2_8 - June 2018 - branch feat/8_Command
+  . allow commands from Serial (USB) and Serial1 (Bluetooth)
+    to change settings
+    
   1.2_4 - June 2018 - branch feat/4_Settings
   . Gather #defines used for Settings object
     and categories others to find more easily
@@ -60,8 +72,6 @@
 // The angle set will range from LOW to HIGH+WIGGLE
 // A new angle will be set at random every SERVO_HOLD_TIME_MS ms
 #define SERVO_HOLD_TIME_MS 500
-//#define SERVO_ANGLE_LOW_LIMIT 90
-//#define SERVO_ANGLE_HIGH_LIMIT 170
 // wiggle was 6
 #define SERVO_ANGLE_WIGGLE 3
 // speed must not be > 255 - SERVO_ANGLE_HIGH or possible byte overflow error
@@ -85,7 +95,12 @@
 #define SERVO_PULSE_USABLE_MIN 1000
 #define SERVO_PULSE_USABLE_MAX 2000
 #define SERVO_PULSE_DELTA_LIMIT 5
+//SERVO ANGLE superseded by servo pulse
+//#define SERVO_ANGLE_LOW_LIMIT 90
+//#define SERVO_ANGLE_HIGH_LIMIT 170
+
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
+// these adjust the rate of updates
 #define SERVO_POSTSCALE_MASK 0x0f
 #define SERVO_POSTSCALE_MASK_SEEKING 0xFF
 // had been 0x3f
@@ -134,6 +149,15 @@
 // an array has to be allocated based on AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE, so maybe not a setting?
 #define AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE 8
 #define INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE 5
+#define COMMAND_PROCESSOR_ENABLE_USB
+#define COMMAND_PROCESSOR_STREAM_USB Serial
+#define COMMAND_PROCESSOR_DATARATE_USB 57600
+#define COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+#define COMMAND_PROCESSOR_STREAM_BLUETOOTH Serial1
+#define COMMAND_PROCESSOR_DATARATE_BLUETOOTH 38400
+#define BT_PIN_RXD 1
+#define BT_PIN_TXD 0
+#define BT_PIN_STATE 5
 
 
 /***********************
@@ -196,6 +220,7 @@
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
 #define DEBUG_SETTINGS
+#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS

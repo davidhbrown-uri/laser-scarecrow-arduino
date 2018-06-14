@@ -1,4 +1,12 @@
 /*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
+/*
   Design used small CdS photocells with a resistance of around
   2.4k in room light (~170 lux), a bit under 100 ohms directly
   under a lamp, and over 140k in the shadow of a cupped hand.

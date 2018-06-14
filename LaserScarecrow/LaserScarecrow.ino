@@ -1,3 +1,10 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
 #include "config.h"
 #include "Settings.h"
 #include "Interrupt.h"
@@ -8,6 +15,9 @@
 #include "IrReflectanceSensor.h"
 #include "LaserController.h"
 #include "AnalogInput.h"
+#include "Command.h"
+#include "CommandProcessor.h"
+#include "SettingsObserver.h"
 
 // definitions for finite state machine
 #define STATE_INIT 0
@@ -39,6 +49,8 @@ unsigned long loopLastAimStatus = 0L;
 
 */
 Settings currentSettings;
+Command uCommand, btCommand;
+CommandProcessor uProcessor, btProcessor;
 
 AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
 
@@ -60,15 +72,58 @@ void setup() {
   digitalWrite(LED1_PIN, LED1_INVERT);
   digitalWrite(LED2_PIN, LED2_INVERT);
 
+  /*********************
+   * Settings, Configuration, and command processors
+   */
+   currentSettings.init();
+   SettingsObserver::init();
+
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  COMMAND_PROCESSOR_STREAM_USB.begin(COMMAND_PROCESSOR_DATARATE_USB);
+  uCommand.init();
+  uProcessor.setCommand(&uCommand);
+  uProcessor.setSettings(&currentSettings);
+//future:  uProcessor.setConfiguration(&configuration);
+//future:  uProcessor.setRTC(&rtc);
+  uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  // pinMode(BT_PIN_STATE, INPUT);// Should be high when connected, low when not
+  pinMode(BT_PIN_RXD, INPUT); // is this going to be handled by Serial1.begin?
+  pinMode(BT_PIN_TXD, OUTPUT);// is this going to be handled by Serial1.begin?
+  COMMAND_PROCESSOR_STREAM_BLUETOOTH.begin(COMMAND_PROCESSOR_DATARATE_BLUETOOTH);
+  btCommand.init();
+  btProcessor.setCommand(&btCommand);
+  btProcessor.setSettings(&currentSettings);
+//future:  btProcessor.setConfiguration(&configuration);
+//future:  btProcessor.setRTC(&rtc);
+  btProcessor.setStream(& COMMAND_PROCESSOR_STREAM_BLUETOOTH);
+#endif   
+  /********************************
+   * Initialize state machine for loop
+   */
   stateCurrent = STATE_POWERON;
   statePrevious = stateCurrent;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+        /*@todo figure out if we should leave the command processing here outside of state 
+       * or move it into what would have to be multiple states: ACTIVE, SEEKING, and SLEEP for sure.
+       * Probably also any future "configuration" state that might be entered on BT connection.
+       */
+#ifdef COMMAND_PROCESSOR_ENABLE_USB
+  uProcessor.process();
+#endif
+#ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
+  btProcessor.process();
+#endif
+  SettingsObserver::process(); // apply any changes to settings
+  
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug) loopLastSerial = millis();
+
 #endif // DEBUG_SERIAL
   /*
     Simple Finite State Machine: arrange each switch case as follows...
@@ -88,7 +143,6 @@ void loop() {
     break;
   */
   switch (stateCurrent) {
-
     case STATE_POWERON:
       currentSettings.init();
       for (int i = 0; i < INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE; i++)
@@ -340,7 +394,7 @@ void setInterruptSpeed()
   {
     currentSettings.interrupt_frequency = map(knobSpeed.getValue(), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
     knobSpeed.acknowledgeNewValue();
-    Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
+    // Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_INTERRUPT_FREQUENCY
     Serial.print(F("\n\r+++Changing frequency via knob. New freq = "));
@@ -361,7 +415,7 @@ void setServoRange()
     int pulseHigh = map(knobAngleRange.getValue(), 0, 1023, pulseLow, SERVO_PULSE_USABLE_MAX);
     currentSettings.servo_min = pulseLow;
     currentSettings.servo_max = pulseHigh;
-    ServoController::applySettings(& currentSettings); // won't need once we have the SettingsObserver
+    //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
   }
 }
 
