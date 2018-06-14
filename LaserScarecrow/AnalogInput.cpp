@@ -5,19 +5,19 @@
 */
 
 #include "AnalogInput.h"
-AnalogInput::AnalogInput(byte pin)
+void AnalogInput::begin(byte pin)
 {
-  AnalogInput(pin, ANALOGINPUT_DEFAULT_READINGS);
+  begin(pin, ANALOGINPUT_DEFAULT_READINGS);
 }
-AnalogInput::AnalogInput(byte pin, byte numReadings)
+void AnalogInput::begin(byte pin, byte numReadings)
 {
-  AnalogInput(pin, numReadings, ANALOGINPUT_DEFAULT_MS);
+  begin(pin, numReadings, ANALOGINPUT_DEFAULT_MS);
 }
-AnalogInput::AnalogInput(byte pin, byte numReadings, unsigned int ms)
+void AnalogInput::begin(byte pin, byte numReadings, unsigned int ms)
 {
-  AnalogInput(pin, numReadings, ms, ANALOGINPUT_DEFAULT_CHANGE_THRESHOLD);
+  begin(pin, numReadings, ms, ANALOGINPUT_DEFAULT_CHANGE_THRESHOLD);
 }
-AnalogInput::AnalogInput(byte pin, byte numReadings, unsigned int ms, int changeThreshold)
+void AnalogInput::begin(byte pin, byte numReadings, unsigned int ms, int changeThreshold)
 {
   _pin = pin;
   _numReadings = constrain(numReadings, 0, ANALOGINPUT_READING_ARRAY_SIZE);

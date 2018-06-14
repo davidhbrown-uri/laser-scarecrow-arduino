@@ -16,10 +16,10 @@
 class AnalogInput
 {
   public:
-    AnalogInput(byte pin);
-    AnalogInput(byte pin, byte numReadings);
-    AnalogInput(byte pin, byte numReadings, unsigned int ms);
-    AnalogInput(byte pin, byte numReadings, unsigned int ms, int threshold);
+    void begin(byte pin);
+    void begin(byte pin, byte numReadings);
+    void begin(byte pin, byte numReadings, unsigned int ms);
+    void begin(byte pin, byte numReadings, unsigned int ms, int threshold);
     void process(); // possibly read the pin if enough time has elapsed 
     bool hasNewValue();
     void acknowledgeNewValue();
