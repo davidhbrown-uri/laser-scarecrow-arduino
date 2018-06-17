@@ -190,7 +190,15 @@ bool SettingsObserver::load(Settings *settings_ptr)
 /**
  * The output of CRC32::calculate(settings_ptr, sizeof(*settings_ptr)) is NOT COMPATIBLE
  * with a CRC32 recalculated on the sequence of bytes saved by EEPROM.put(*settings_ptr).
- * This function does generate the same sequence of bytes and so the same checksum
+ * This function does generate the same sequence of bytes and so the same checksum.
+ * 
+ * Hmm... looking at the source code for the CRC32 library at https://github.com/bakercp/CRC32/blob/master/src/CRC32.h
+ * it looks like maybe for the size parameter, I should give 1, not the actual size which is
+ * taken from the Type parameter once it works down to calling crc.update(data,size). 
+ * Could be it was calculating the CRCs on 22*23 bytes of unknown data after my Settings object.
+ * 
+ * Need to get in the habit of reading other people's code when mine isn't working but I'm sure it should...
+ * 
  */
 uint32_t SettingsObserver::settingsCRC(Settings *settings_ptr)
 {
