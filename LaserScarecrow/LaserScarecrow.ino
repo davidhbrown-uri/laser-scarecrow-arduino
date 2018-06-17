@@ -4,7 +4,7 @@
    Part of the URI Laser Scarecrow project
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
- */
+*/
 #include "config.h"
 #include "Settings.h"
 #include "Interrupt.h"
@@ -73,18 +73,18 @@ void setup() {
   digitalWrite(LED2_PIN, LED2_INVERT);
 
   /*********************
-   * Settings, Configuration, and command processors
-   */
-   currentSettings.init();
-   SettingsObserver::init();
+     Settings, Configuration, and command processors
+  */
+  currentSettings.init();
+  SettingsObserver::init();
 
 #ifdef COMMAND_PROCESSOR_ENABLE_USB
   COMMAND_PROCESSOR_STREAM_USB.begin(COMMAND_PROCESSOR_DATARATE_USB);
   uCommand.init();
   uProcessor.setCommand(&uCommand);
   uProcessor.setSettings(&currentSettings);
-//future:  uProcessor.setConfiguration(&configuration);
-//future:  uProcessor.setRTC(&rtc);
+  //future:  uProcessor.setConfiguration(&configuration);
+  //future:  uProcessor.setRTC(&rtc);
   uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
 #endif
 #ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
@@ -95,23 +95,23 @@ void setup() {
   btCommand.init();
   btProcessor.setCommand(&btCommand);
   btProcessor.setSettings(&currentSettings);
-//future:  btProcessor.setConfiguration(&configuration);
-//future:  btProcessor.setRTC(&rtc);
+  //future:  btProcessor.setConfiguration(&configuration);
+  //future:  btProcessor.setRTC(&rtc);
   btProcessor.setStream(& COMMAND_PROCESSOR_STREAM_BLUETOOTH);
-#endif   
+#endif
   /********************************
-   * Initialize state machine for loop
-   */
+     Initialize state machine for loop
+  */
   stateCurrent = STATE_POWERON;
   statePrevious = stateCurrent;
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-        /*@todo figure out if we should leave the command processing here outside of state 
-       * or move it into what would have to be multiple states: ACTIVE, SEEKING, and SLEEP for sure.
-       * Probably also any future "configuration" state that might be entered on BT connection.
-       */
+  /*@todo figure out if we should leave the command processing here outside of state
+    or move it into what would have to be multiple states: ACTIVE, SEEKING, and SLEEP for sure.
+    Probably also any future "configuration" state that might be entered on BT connection.
+  */
 #ifdef COMMAND_PROCESSOR_ENABLE_USB
   uProcessor.process();
 #endif
@@ -119,7 +119,7 @@ void loop() {
   btProcessor.process();
 #endif
   SettingsObserver::process(); // apply any changes to settings
-  
+
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug) loopLastSerial = millis();
@@ -167,10 +167,23 @@ void loop() {
     case STATE_INIT:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;
-        //enter code:
+        // onEnter code:
 #ifdef DEBUG_SERIAL
         Serial.println(F("\r\n[[Entering INIT State]]"));
 #endif // DEBUG_SERIAL
+        if (SettingsObserver::load(&currentSettings))
+        {
+#ifdef DEBUG_SERIAL
+          Serial.println(F("Loaded settings from storage."));
+#endif
+          ;
+        }
+        else
+        {
+#ifdef DEBUG_SERIAL
+          Serial.println(F("Could not load settings from storage."));
+#endif
+        }
         LaserController::init();
         ServoController::init();
         StepperController::init();
@@ -307,7 +320,7 @@ void loop() {
   {
     Serial.println();
     Serial.print(SOFTWARE_VERSION);
-#ifdef DEBUG_SETTINGS
+#ifdef DEBUG_SETTINGS_VERBOSE
     currentSettings.printToStream(&Serial);
 #endif
 #ifdef DEBUG_REFLECTANCE
