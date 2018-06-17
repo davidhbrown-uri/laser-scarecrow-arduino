@@ -32,6 +32,12 @@
 #define Settings_h
 #include "Arduino.h"
 #include "config.h"
+
+// if/when settings are added, increment 
+// the SETTINGS_VERSION, but as it will be
+// stored in a single byte, if we ever reach
+// 256, roll over to 0.
+#define SETTINGS_VERSION 1
 class Settings {
   public:
     Settings();
@@ -47,14 +53,13 @@ class Settings {
     int stepper_stepsWhileSeeking; //done but no control implemented
     int light_sensor_threshold; //done but no control implemented
     byte cycle_mode; //depends on RTC feature not yet implemented
-    word rtc_wake; //depends on RTC feature not yet implemented
-    word rtc_sleep; //depends on RTC feature not yet implemented
+    unsigned int rtc_wake; //depends on RTC feature not yet implemented
+    unsigned int rtc_sleep; //depends on RTC feature not yet implemented
     int stepper_target; // not implemented
     int interrupt_frequency; // done, including knob control
     int servo_min; // done, including knob control
     int servo_max; // done, including knob control; changed name/concept from servo_range... while the knob controls range, it makes sense for the setting to be a point, not a delta
     int servo_hold_time; // done but no control implemented
-
 }; //class Settings
 #endif
 

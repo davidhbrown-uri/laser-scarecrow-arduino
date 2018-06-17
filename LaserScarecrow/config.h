@@ -8,7 +8,7 @@
  
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.2_8 - def - feat/8")
+#define SOFTWARE_VERSION F("Version 1.2_9 - dev - feat/14")
 
 /*******************
    VERSION HISTORY
@@ -142,6 +142,8 @@
 // these thresholds will be raw values when using AnalogInput
 #define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 20
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
+//for testing, save settings 30000 ms (30 seconds) after last change; change to 300000 (5 minutes) for release
+#define SETTINGSOBSERVER_SAVE_AFTER_MS 30000
 
 /*************
  * Software configuration
@@ -213,13 +215,14 @@
 #define DEBUG_SERIAL
 #define DEBUG_SERIAL_DATARATE 57600
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 4000
-#define DEBUG_SERIAL_COUNTDOWN_SECONDS 5
-#define DEBUG_SERVO
-#define DEBUG_KNOBS
-#define DEBUG_LIGHTSENSOR
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 6
+//#define DEBUG_SERVO
+//#define DEBUG_KNOBS
+//#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
 #define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS_VERBOSE
 #define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
