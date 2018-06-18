@@ -5,25 +5,28 @@
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
  */
- 
+
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.2_9 - dev - feat/14")
+#define SOFTWARE_VERSION F("Version 1.3_0 - dev - feat/7_rtc")
 
 /*******************
    VERSION HISTORY
  *******************
+  1.3_0 - June 2018 - control of sleep/wake via RTC
+
+  1.2_9 - June 2018 - automatic save and load of settings from EEPROM
 
   1.2_8 - June 2018 - branch feat/8_Command
   . allow commands from Serial (USB) and Serial1 (Bluetooth)
     to change settings
-    
+
   1.2_4 - June 2018 - branch feat/4_Settings
   . Gather #defines used for Settings object
     and categories others to find more easily
   . rename STEPPER_PIN_HALFSTEPPING STEPPER_PIN_MICROSTEP
     because microstep pins can be selected with jumpers on 2018 boards
-  
+
   1.1.1 - May 28 2018
   . Minor clean-up for github initial release
 
@@ -123,6 +126,8 @@
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
 #define SEEKING_ROTATION_LIMIT 2
+//how often the RTC should refresh
+#define RTC_REFRESH_MILLIS 2000
 
 
 /***************************
@@ -164,7 +169,7 @@
 
 /***********************
  * Arduino / pin assignments
- * 
+ *
  ********************/
 
 // use 8-bit timer 2 for ATmega328 (UNO, Pro Mini)
@@ -174,7 +179,7 @@
 // # define INTERRUPTS_ATmega32U4_T1
 #define INTERRUPTS_ATmega32U4_T3
 
-// Pin assignments valid April 2017 through at least June 2018 
+// Pin assignments valid April 2017 through at least June 2018
 // for Arduino Pro Micro (Sparkfun design)
 
 #define AMBIENTLIGHTSENSOR_PIN A0
@@ -208,7 +213,8 @@
 #define LED2_PIN LED_BUILTIN_TX
 #define LED2_INVERT true
 
-
+#define RTC_WIRE_RTC_ADDRESS 0x68
+#define RTC_WIRE_EE_ADDRESS 0x57
 /***************************
  * DEBUG Flags
  */
@@ -229,4 +235,5 @@
 //#define DEBUG_STEPPER_STEPS
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
-#define DEBUG_INTERRUPT_FREQUENCY
+//#define DEBUG_INTERRUPT_FREQUENCY
+#define DEBUG_RTC

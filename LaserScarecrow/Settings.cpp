@@ -20,7 +20,7 @@ void Settings::init() {
   stepper_randomsteps_min = STEPPER_RANDOMSTEPS_MIN;
   stepper_randomsteps_max = STEPPER_RANDOMSTEPS_MAX;
   stepper_stepsWhileSeeking = STEPPER_STEPS_WHILE_SEEKING;
-  cycle_mode = 0; //use light sensor
+  rtc_control = 0; //use light sensor
   light_sensor_threshold = AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD;
   // selection of defaults based on twilight extremes in June and July 2018 from:
   // https://www.sunrisesunset.com/USA/RhodeIsland/
@@ -54,9 +54,8 @@ void Settings::printToStream(Stream *st)
   st->println(stepper_randomsteps_max);
   st->print(F("  > Stepper steps while seeking (full steps) = "));
   st->println(stepper_stepsWhileSeeking);
-  st->print(F(" >> Sleep/wake mode = "));
-  st->print(cycle_mode & 2 == 2 ? F("clock/") : F("sensor/"));
-  st->println(cycle_mode & 1 == 1 ? F("clock") : F("sensor"));
+  st->print(F(" >> Sleep/wake control = "));
+  st->println(rtc_control? F("clock") : F("sensor"));
   st->print(F("  > Sleep time (24h hours:minutes) = "));
   st->print(rtc_sleep/60);
   st->print(':');

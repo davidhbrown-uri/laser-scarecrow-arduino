@@ -52,7 +52,7 @@ class Settings {
     int stepper_randomsteps_max; //done but no control implemented
     int stepper_stepsWhileSeeking; //done but no control implemented
     int light_sensor_threshold; //done but no control implemented
-    byte cycle_mode; //depends on RTC feature not yet implemented
+    bool rtc_control; //depends on RTC feature not yet implemented
     unsigned int rtc_wake; //depends on RTC feature not yet implemented
     unsigned int rtc_sleep; //depends on RTC feature not yet implemented
     int stepper_target; // not implemented

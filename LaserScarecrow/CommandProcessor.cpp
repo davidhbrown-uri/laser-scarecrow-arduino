@@ -4,8 +4,8 @@
    Part of the URI Laser Scarecrow project
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
- */
- 
+*/
+
 /**
    @see CommandProcessor.h
 */
@@ -24,22 +24,17 @@ void CommandProcessor::setSettings(Settings *stgs)
   settings = stgs;
 }
 /* Future:
-void CommandProcessor::setConfiguration(Configuration *cf)
-{
+  void CommandProcessor::setConfiguration(Configuration *cf)
+  {
   configuration = cf;
-}
+  }
 */
 void CommandProcessor::setStream(Stream *st)
 {
   stream = st;
   stream->println(F("Laser Scarecrow Command Processor Ready!"));
 }
-/*
-void CommandProcessor::setRTC(MockRTC *mockRTC)
-{
-  rtc=mockRTC;
-}
-*/
+
 void CommandProcessor::process()
 {
   if (stream->available() && command->isWritable()) {
@@ -53,14 +48,6 @@ void CommandProcessor::process()
         stream->print(' ');
         switch (command->code) {
           case CPCODE_Hello:
-            processOK();
-            break;          
-          case CPCODE_CycleMode:
-            stream->println(settings->cycle_mode);
-            processOK();
-            break;
-          case CPCODE_LightThrehold:
-            stream->println(settings->light_sensor_threshold);
             processOK();
             break;
           case CPCODE_InterruptRate:
@@ -76,37 +63,58 @@ void CommandProcessor::process()
             processOK();
             break;
           case CPCODE_ServoRange:
-            stream->println(settings->servo_max-settings->servo_min);
+            stream->println(settings->servo_max - settings->servo_min);
             processOK();
             break;
-/*
+
+          case CPCODE_RtcYmd:
+            stream->print(rtc.year()); stream->print(' ');
+            stream->print(rtc.month()); stream->print(' ');
+            stream->println(rtc.day());
+            processOK();
+            break;
           case CPCODE_RtcHms:
-             stream->print(rtc->getHours()); stream->print(' ');
-             stream->print(rtc->getMinutes()); stream->print(' ');
-             stream->println(rtc->getSeconds());
-             processOK();
-             break;
+            stream->print(rtc.hour()); stream->print(' ');
+            stream->print(rtc.minute()); stream->print(' ');
+            stream->println(rtc.second());
+            processOK();
+            break;
+          case CPCODE_RtcRunning:
+            stream->println(rtc_is_running ? 1 : 0);
+            processOK();
+            break;
           case CPCODE_RtcWake:
-             stream->print(getHoursFromTimeWord(settings->rtc_wake)); stream->print(' ');
-             stream->println(getMinutesFromTimeWord(settings->rtc_wake));
-             processOK();
-             break;
+            stream->print(getHoursFromTimeWord(settings->rtc_wake)); stream->print(' ');
+            stream->println(getMinutesFromTimeWord(settings->rtc_wake));
+            processOK();
+            break;
           case CPCODE_RtcSleep:
-             stream->print(getHoursFromTimeWord(settings->rtc_sleep)); stream->print(' ');
-             stream->println(getMinutesFromTimeWord(settings->rtc_sleep));
-             processOK();
-             break;
-*/
+            stream->print(getHoursFromTimeWord(settings->rtc_sleep)); stream->print(' ');
+            stream->println(getMinutesFromTimeWord(settings->rtc_sleep));
+            processOK();
+            break;
+          case CPCODE_RtcControl:
+            stream->println(settings->rtc_control);
+            processOK();
+            break;
+          case CPCODE_LightSensorRead:
+            stream->println(AmbientLightSensor::read());
+            processOK();
+            break;
+          case CPCODE_LightThrehold:
+            stream->println(settings->light_sensor_threshold);
+            processOK();
+            break;
           default:
             processError(CPSTATUS_InvalidCode);
         } // switch code
         break; // case L (look / report)
       case 'S':
         switch (command->code) {
-          case CPCODE_CycleMode: // cycle_mode
-            if (command->parameterCount == 1 && command->parameter[0] < 4)
+          case CPCODE_RtcControl: // rtc_control
+            if (command->parameterCount == 1 && command->parameter[0] < 2)
             {
-              settings->cycle_mode = command->parameter[0];
+              settings->rtc_control = command->parameter[0];
               processOK();
             } else
             {
@@ -128,7 +136,7 @@ void CommandProcessor::process()
             {
               /* @todo get limits from configuration */
               /* @todo rename Rate to Frequency */
-              settings->interrupt_frequency = constrain(command->parameter[0],INTERRUPT_FREQUENCY_MIN,INTERRUPT_FREQUENCY_MAX);
+              settings->interrupt_frequency = constrain(command->parameter[0], INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
               processOK();
             } else
             {
@@ -140,7 +148,7 @@ void CommandProcessor::process()
             {
               settings->stepper_target = command->parameter[0] % 360;
               processOK();
-            } else 
+            } else
             {
               processError(CPSTATUS_InvalidParameter);
             }
@@ -160,47 +168,70 @@ void CommandProcessor::process()
             if (command->parameterCount == 1 && command->parameter[0] < 1024)
             {
               /* @todo get SERVO_ANGLE_HIGH_LIMIT from configuration */
-              settings->servo_max = map(command->parameter[0],0,1023,settings->servo_min,SERVO_PULSE_USABLE_MAX);
+              settings->servo_max = map(command->parameter[0], 0, 1023, settings->servo_min, SERVO_PULSE_USABLE_MAX);
               processOK();
             } else
             {
               processError(CPSTATUS_InvalidParameter);
             }
             break; //CPCODE_ServoRange
-/*            
+          case CPCODE_RtcYmd:
+            if (command->parameterCount > 2 && command->parameterCount < 4) {
+              int year = command->parameter[0] % 100;
+              int month = command->parameter[1] % 12;
+              int day = command->parameter[2] % 31;
+              stream->print(year); stream->print(' ');
+              stream->print(month); stream->print(' ');
+              stream->println(day);
+              rtc.set(rtc.second(), rtc.minute(), rtc.hour(), rtc.dayOfWeek(),
+                      day, month, year);
+              rtc.refresh();
+              rtc_is_running = true;//at least, it had better be
+              processOK();
+            } else
+            {
+              processError(CPSTATUS_InvalidParameter);
+            }
+            break;
           case CPCODE_RtcHms:
+            // note that both the 1307 and 3231 use 24-hour mode unless
+            // bit 6 is set high when setting the hours. So, unless you
+            // try to make 12-hour mode happen, it won't, so don't worry
+            // about it. Similarly, the oscillator will run and time will
+            // be kept unless bit 7 of the seconds register is raised.
             if (command->parameterCount > 1 && command->parameterCount < 4) {
               int hours = command->parameter[0] % 24;
               int minutes = command->parameter[1] % 60;
-              int seconds = (command->parameterCount == 3) ? command->parameter[2] % 60 : 0; 
-              stream->print(hours);stream->print(':');
-              stream->print(minutes);stream->print(':');
+              int seconds = (command->parameterCount == 3) ? command->parameter[2] % 60 : 0;
+              stream->print(hours); stream->print(' ');
+              stream->print(minutes); stream->print(' ');
               stream->println(seconds);
-              rtc->setTime(hours, minutes, seconds);
+              rtc.set(seconds, minutes, hours, rtc.dayOfWeek(), rtc.day(), rtc.month(), rtc.year());
+              rtc.refresh();
+              rtc_is_running = true;//at least, it had better be
               processOK();
-            } else 
+            } else
             {
               processError(CPSTATUS_InvalidParameter);
             }
             break;
           case CPCODE_RtcWake:
           case CPCODE_RtcSleep:
-            if(command->parameterCount == 2 && 
-              command->parameter[0]>=0 && command->parameter[0]<24 && 
-              command->parameter[1]>=0 && command->parameter[0]<60) {
-                if(command->code==CPCODE_RtcWake) {
-                  settings->rtc_wake = getTimeWord(command->parameter[0],command->parameter[1]);
-                } else {
-                  settings->rtc_sleep = getTimeWord(command->parameter[0],command->parameter[1]);
-                }
-                processOK();
-              } // if parameters valid
-             else 
+            if (command->parameterCount == 2 &&
+                command->parameter[0] >= 0 && command->parameter[0] < 24 &&
+                command->parameter[1] >= 0 && command->parameter[0] < 60) {
+              if (command->code == CPCODE_RtcWake) {
+                settings->rtc_wake = getTimeWord(command->parameter[0], command->parameter[1]);
+              } else {
+                settings->rtc_sleep = getTimeWord(command->parameter[0], command->parameter[1]);
+              }
+              processOK();
+            } // if parameters valid
+            else
             {
               processError(CPSTATUS_InvalidParameter);
             }
-             break;
-*/
+            break;
           default:
             processError(CPSTATUS_InvalidCode);
         } // switch code
@@ -213,13 +244,13 @@ void CommandProcessor::process()
           case 1: //verbosity
             verbose = (command->parameterCount > 0 && command->parameter[0] > 0);
             break;
-/*            
-          case CPCODE_RtcHms:
-            stream->print(F("System millis = ")); stream->println(millis());
-            stream->print(F("MockRTC offset = ")); stream->println(rtc->offset);
-            stream->print(F("MockRTC millisSinceMidnight = ")); stream->println(rtc->getMillisSinceMidnight());
-            break;
-*/            
+            /*
+                      case CPCODE_RtcHms:
+                        stream->print(F("System millis = ")); stream->println(millis());
+                        stream->print(F("MockRTC offset = ")); stream->println(rtc.offset);
+                        stream->print(F("MockRTC millisSinceMidnight = ")); stream->println(rtc.getMillisSinceMidnight());
+                        break;
+            */
         }// switch code
         // for any debug code, call it good.
         processOK();
@@ -260,15 +291,14 @@ void CommandProcessor::finishProcess()
   status = CPSTATUS_Ready;
 }
 
-byte CommandProcessor::getHoursFromTimeWord(word time){
+byte CommandProcessor::getHoursFromTimeWord(word time) {
   word hours = time / 60;
   return hours > 255 ? 255 : hours;
 }
-byte CommandProcessor::getMinutesFromTimeWord(word time){
+byte CommandProcessor::getMinutesFromTimeWord(word time) {
   return time % 60;
 }
 word CommandProcessor::getTimeWord(byte hours, byte minutes)
 {
-  return (word) (60L*(long)hours+(long)minutes);
+  return (word) (60L * (long)hours + (long)minutes);
 }
-
