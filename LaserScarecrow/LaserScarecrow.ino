@@ -18,6 +18,10 @@
 #include "Command.h"
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
+#include <Wire.h>
+#include <uRTCLib.h>
+
+
 
 // definitions for finite state machine
 #define STATE_INIT 0
@@ -26,6 +30,11 @@
 #define STATE_DARK 3
 #define STATE_COOLDOWN 4
 #define STATE_POWERON 255
+
+
+/*****************
+   GLOBALS
+*/
 byte stateCurrent, statePrevious;
 
 unsigned long loopLedLastChangeMillis = 0L;
@@ -41,18 +50,27 @@ unsigned long loopLastAimStatus = 0L;
 #endif
 #endif
 
+unsigned long rtc_last_refresh_millis = 0UL;
+bool rtc_is_running = false;
+uint8_t rtc_last_second;
 /*
-      In classes that need to access the current settings, put the following near the top:
+      In classes that need to access the current settings,
+      put the following near the top:
 
   #include "Settings.h"
   extern Settings currentSettings;
 
 */
 Settings currentSettings;
+uRTCLib rtc(RTC_WIRE_RTC_ADDRESS, RTC_WIRE_EE_ADDRESS);
 Command uCommand, btCommand;
 CommandProcessor uProcessor, btProcessor;
 
 AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
+
+/*************************************
+   SETUP
+*/
 
 void setup() {
   // put your setup code here, to run once:
@@ -71,6 +89,21 @@ void setup() {
   pinMode(LED2_PIN, OUTPUT);
   digitalWrite(LED1_PIN, LED1_INVERT);
   digitalWrite(LED2_PIN, LED2_INVERT);
+
+  // Wire and RTC
+  Wire.begin();
+  // check if clock is running
+  rtc.refresh();
+  rtc_last_second = rtc.second();
+  delay(1200);
+  rtc.refresh();
+  rtc_is_running = (rtc_last_second != rtc.second());
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_RTC
+  Serial.print(F("RTC at startup is "));
+  Serial.println(rtc_is_running ? F("running") : F("STOPPED"));
+#endif
+#endif
 
   /*********************
      Settings, Configuration, and command processors
@@ -105,6 +138,10 @@ void setup() {
   stateCurrent = STATE_POWERON;
   statePrevious = stateCurrent;
 }
+
+/****************
+   LOOP
+*/
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -143,6 +180,9 @@ void loop() {
     break;
   */
   switch (stateCurrent) {
+    /*********************
+      POWERON
+    *********************/
     case STATE_POWERON:
       currentSettings.init();
       for (int i = 0; i < INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE; i++)
@@ -164,6 +204,9 @@ void loop() {
       stateCurrent = STATE_INIT;
       break;
 
+    /*********************
+      INIT
+    *********************/
     case STATE_INIT:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;
@@ -200,6 +243,9 @@ void loop() {
       }
       break;
 
+    /*********************
+      ACTIVE
+    *********************/
     case STATE_ACTIVE:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;
@@ -218,7 +264,14 @@ void loop() {
       // check for transition events (later checks have priority)
       if (IrReflectanceSensor::isPresent()) stateCurrent = STATE_SEEKING;
       if (LaserController::isCoolingDown()) stateCurrent = STATE_COOLDOWN;
-      if (AmbientLightSensor::isDark()) stateCurrent = STATE_DARK;
+      if (rtc_is_running && currentSettings.rtc_control) 
+      {
+        if (!rtcIsWakePeriod()) stateCurrent = STATE_DARK;
+      }
+      else 
+      {
+        if (AmbientLightSensor::isDark()) stateCurrent = STATE_DARK;
+      }
       // do our things:
       setInterruptSpeed();
       if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(STEPPER_RANDOMSTEPS_MIN, STEPPER_RANDOMSTEPS_MAX);
@@ -227,6 +280,9 @@ void loop() {
         //exit code:
       }
       break;
+    /*********************
+      SEEKING
+    *********************/
     case STATE_SEEKING:
       if (stateCurrent != statePrevious) { // onEntry
         statePrevious = stateCurrent;
@@ -260,6 +316,9 @@ void loop() {
         //exit code:
       }
       break;
+    /*********************
+      DARK
+    *********************/
     case STATE_DARK:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;
@@ -274,9 +333,13 @@ void loop() {
         Interrupt::setFrequency(1);
       }
       //update:
-      if (AmbientLightSensor::isLight())
+      if (rtc_is_running && currentSettings.rtc_control)
       {
-        stateCurrent = STATE_SEEKING;
+        if (rtcIsWakePeriod()) stateCurrent = STATE_SEEKING;
+      }
+      else 
+      {
+        if (AmbientLightSensor::isLight()) stateCurrent = STATE_SEEKING;
       }
       if (stateCurrent != statePrevious) {
         //exit code:
@@ -284,6 +347,9 @@ void loop() {
         Interrupt::applySettings(& currentSettings);
       }
       break;
+    /*********************
+      COOLDOWN
+    *********************/
     case STATE_COOLDOWN:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;
@@ -313,6 +379,13 @@ void loop() {
   // timing-imprecise tasks:
   LaserController::update();
   AmbientLightSensor::update();
+  if (millis() - rtc_last_refresh_millis > RTC_REFRESH_MILLIS)
+  {
+    rtc.refresh();
+    rtc_last_refresh_millis = millis();
+    rtc_is_running = ( rtc.second() != rtc_last_second);
+    rtc_last_second = rtc.second();
+  }
   digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
 
 #ifdef DEBUG_SERIAL
@@ -339,22 +412,50 @@ void loop() {
     Serial.print(StepperController::getStepsToStep());
 #endif
 #ifdef DEBUG_SERVO
-    Serial.print("\r\nServoController::pulse=");
+    Serial.print(F("\r\nServoController::pulse="));
     Serial.print(ServoController::getPulse());
-    Serial.print("; target=");
+    Serial.print(F("; target="));
     Serial.print(ServoController::getPulseTarget());
-    Serial.print("; rangeMin=");
+    Serial.print(F("; rangeMin="));
     Serial.print(ServoController::getPulseRangeMin());
-    Serial.print("; rangeMax=");
+    Serial.print(F("; rangeMax="));
     Serial.print(ServoController::getPulseRangeMax());
 #endif
 #ifdef DEBUG_KNOBS
-    Serial.print("\r\nKNOB1=");
+    Serial.print(F("\r\nKNOB1="));
     Serial.print(analogRead(KNOB1_PIN));
-    Serial.print("; KNOB2=");
+    Serial.print(F("; KNOB2="));
     Serial.print(analogRead(KNOB2_PIN));
-    Serial.print("; KNOB3=");
+    Serial.print(F("; KNOB3="));
     Serial.print(analogRead(KNOB3_PIN));
+#endif
+#ifdef DEBUG_RTC
+    rtc.refresh();
+
+    Serial.print(F("\r\nRTC DateTime: "));
+    Serial.print(rtc.year());
+    Serial.print('/');
+    Serial.print(rtc.month());
+    Serial.print('/');
+    Serial.print(rtc.day());
+
+    Serial.print(' ');
+
+    Serial.print(rtc.hour());
+    Serial.print(':');
+    Serial.print(rtc.minute());
+    Serial.print(':');
+    Serial.print(rtc.second());
+    Serial.print(F("\r\n  wake/sleep cycle mode = "));
+    Serial.print(currentSettings.rtc_control ? F("RTC") : F("sensor"));
+    Serial.print(F("; if RTC control, wake at "));
+    Serial.print(currentSettings.rtc_wake / 60);
+    Serial.print(':');
+    Serial.print(currentSettings.rtc_wake % 60);
+    Serial.print(F(" and sleep at "));
+    Serial.print(currentSettings.rtc_sleep / 60);
+    Serial.print(':');
+    Serial.println(currentSettings.rtc_sleep % 60);
 #endif
     Serial.println();
   } //output serial debug
@@ -399,6 +500,22 @@ ISR(TIMER3_COMPA_vect)
    Helper functions
    Put things here that require access to multuple modules
 */
+
+/** considers cycle mode and RTC
+    True if RTC settings indicate it's a wake period
+
+*/
+bool rtcIsWakePeriod()
+{
+  int timeInt = rtc.hour();
+  if (timeInt < 0 || timeInt > 23) // invalid values indicate a problem with the RTC, so let's be awake
+  {
+    return true;
+  }
+  timeInt *= 60;
+  timeInt += rtc.minute();
+  return (timeInt > currentSettings.rtc_wake) != (timeInt > currentSettings.rtc_sleep) != (currentSettings.rtc_wake > currentSettings.rtc_sleep);
+}
 
 void setInterruptSpeed()
 {
@@ -660,5 +777,3 @@ void findReflectanceThreshold() {
 #endif
   }
 } // findReflectanceThreshold
-
-
