@@ -13,9 +13,12 @@
 /*******************
    VERSION HISTORY
  *******************
-  1.3_0 - June 2018 - control of sleep/wake via RTC
 
-  1.2_9 - June 2018 - automatic save and load of settings from EEPROM
+  1.3_1 - June 2018 - branch develop - adjust servo settings for Futaba 1307S
+  
+  1.3_0 - June 2018 - branch feat/7_rtc control of sleep/wake via RTC
+
+  1.2_9 - June 2018 - branch feat/14_save_settings automatic save and load of settings from EEPROM
 
   1.2_8 - June 2018 - branch feat/8_Command
   . allow commands from Serial (USB) and Serial1 (Bluetooth)
@@ -87,20 +90,22 @@
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
 #define LASER_DUTYCYCLERUNTIME 1800000
 #define LASER_DUTYCYCLECOOLDOWN 300000
-// the ms ranges should be determined for each model of servo used
-// MG90s purchased in 2017: control range apx 0.7ms (700µs) to 2.3ms
-// 1ms to 2ms resulted in 90-degree movement
-// Mount horn on left because lower values rotate further clockwise.
-// Mount arm on horn so that 1ms points down and 2ms points back across the servo case.
-// Pulse time units are in µs
-#define SERVO_PULSE_SAFETY_MIN 700
-#define SERVO_PULSE_SAFETY_MAX 2300
-#define SERVO_PULSE_USABLE_MIN 1000
-#define SERVO_PULSE_USABLE_MAX 2000
+// Pulse time units are in µs; ranges should be determined for each model of servo used
+// (Angle is too imprecise)
+// 2017: MG90s purchased in 2017: control range apx 700µs to 2300µs
+// 2017: 1ms to 2ms resulted in 90-degree movement
+// 2017: Mounted horn on left because lower values rotate further clockwise.
+// 2017: Mounted arm on horn so that 1ms points down and 2ms points back across the servo case.
+// 2018: Futaba 1307S: control range apx 700µs to 2300µs
+// 2018: Horn mounted on right; minimum angle = flat across top of crop; 
+// 2018:   increasing / maximum angle points down into canopy
+// 2018: Futaba S1307: useful range apx 560µs to 2050µs; movemen
+// 2018: Futaba S1307: movement stops (before physical limits) at 550µs, 2400µs
+#define SERVO_PULSE_SAFETY_MIN 550
+#define SERVO_PULSE_SAFETY_MAX 2400
+#define SERVO_PULSE_USABLE_MIN 560
+#define SERVO_PULSE_USABLE_MAX 2050
 #define SERVO_PULSE_DELTA_LIMIT 5
-//SERVO ANGLE superseded by servo pulse
-//#define SERVO_ANGLE_LOW_LIMIT 90
-//#define SERVO_ANGLE_HIGH_LIMIT 170
 
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
 // these adjust the rate of updates
