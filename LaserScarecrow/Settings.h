@@ -55,7 +55,7 @@ class Settings {
     bool rtc_control; //depends on RTC feature not yet implemented
     unsigned int rtc_wake; //depends on RTC feature not yet implemented
     unsigned int rtc_sleep; //depends on RTC feature not yet implemented
-    int stepper_target; // not implemented
+    //int stepper_target; // not implemented -- not a setting! Part of current state.
     int interrupt_frequency; // done, including knob control
     int servo_min; // done, including knob control
     int servo_max; // done, including knob control; changed name/concept from servo_range... while the knob controls range, it makes sense for the setting to be a point, not a delta

@@ -8,12 +8,14 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.3_0 - dev - feat/7_rtc")
+#define SOFTWARE_VERSION F("Version 1.4_0 - dev - feat/16_bt_manual")
 
 /*******************
    VERSION HISTORY
  *******************
 
+  1.4_0 - June 2018 - branch feat/16_bt_manual add manual control state triggered by BT connection
+  
   1.3_1 - June 2018 - branch develop - adjust servo settings for Futaba 1307S
   
   1.3_0 - June 2018 - branch feat/7_rtc control of sleep/wake via RTC
@@ -167,10 +169,6 @@
 #define COMMAND_PROCESSOR_ENABLE_BLUETOOTH
 #define COMMAND_PROCESSOR_STREAM_BLUETOOTH Serial1
 #define COMMAND_PROCESSOR_DATARATE_BLUETOOTH 38400
-#define BT_PIN_RXD 1
-#define BT_PIN_TXD 0
-#define BT_PIN_STATE 5
-
 
 /***********************
  * Arduino / pin assignments
@@ -194,10 +192,14 @@
 
 #define IR_REFLECTANCE_PIN A10
 
-// Bluetooth is on Serial1 at pins 0/1
-
 #define RTC_PIN_SDA 2
 #define RTC_PIN_SCL 3
+
+// Bluetooth is on Serial1 at pins 0/1
+// also have to initialize the pins in setup:
+#define BT_PIN_RXD 1
+#define BT_PIN_TXD 0
+#define BT_PIN_STATE 5
 
 //The stepper must be controlled via an Allegro A4988
 //driver such as https://www.pololu.com/product/1182
@@ -227,18 +229,19 @@
 #define DEBUG_SERIAL_DATARATE 57600
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 4000
 #define DEBUG_SERIAL_COUNTDOWN_SECONDS 6
-//#define DEBUG_SERVO
+#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
-#define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
-#define DEBUG_SETTINGSOBSERVER
+//#define DEBUG_SETTINGSOBSERVER
 
-//#define DEBUG_STEPPER
-//#define DEBUG_STEPPER_STEPS
-//#define DEBUG_LASERCONTROLLER
+#define DEBUG_STEPPER
+#define DEBUG_STEPPER_STEPS
+#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
-//#define DEBUG_INTERRUPT_FREQUENCY
-#define DEBUG_RTC
+#define DEBUG_INTERRUPT_FREQUENCY
+//#define DEBUG_RTC
+#define DEBUG_BLUETOOTH

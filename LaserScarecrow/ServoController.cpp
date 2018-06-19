@@ -12,6 +12,7 @@
 
 #define SERVO_RUNNING_STATE_SEEKING 1
 #define SERVO_RUNNING_STATE_HOLDING 2
+#define SERVO_RUNNING_STATE_MANUAL 3
 
 Servo ServoController::_servo;
 volatile bool ServoController::_running;
@@ -28,13 +29,10 @@ void ServoController::init() {
   
   applySettings(& currentSettings);
 
-  _pulse = (SERVO_PULSE_USABLE_MIN + SERVO_PULSE_USABLE_MAX ) / 2;
+  _pulse = (_pulseRangeMin + _pulseRangeMax ) / 2;
   _pulseTarget = _pulse;
-  _pulseRangeMin = _pulse;
-  _pulseRangeMax = _pulse;
   _running = false;
   _runningState = SERVO_RUNNING_STATE_SEEKING;
-  setHoldTime(SERVO_HOLD_TIME_MS);
 }
 void ServoController::update()
 {
@@ -50,6 +48,7 @@ void ServoController::update()
           _servo.detach();
         }
         //if, not else: we want to fall through to this
+      case SERVO_RUNNING_STATE_MANUAL: //manual never holds so never picks a new value
         if (_pulse != _pulseTarget)
         {
           int delta = _pulseTarget - _pulse;
@@ -69,7 +68,7 @@ void ServoController::update()
         }
         break;
       default: //shouldn't happen, but just in case...
-        _runningState = SERVO_RUNNING_STATE_SEEKING;
+        _runningState = SERVO_RUNNING_STATE_HOLDING;
     }
 
   } // if running
@@ -78,21 +77,26 @@ void ServoController::stop()
 {
   _servo.detach();
   _running = false;
+  _runningState = SERVO_RUNNING_STATE_HOLDING;
 }
 void ServoController::run()
 {
   _servo.attach(SERVO_PIN_PULSE);
-  //_servo.write(_angle);
   _servo.writeMicroseconds(_pulse);
   _running = true;
+  _runningState = SERVO_RUNNING_STATE_HOLDING;
+}
+
+void ServoController::runManually()
+{
+  run();
+  _runningState = SERVO_RUNNING_STATE_MANUAL;
 }
 
 void ServoController::setPulseRange(int low, int high)
 {
-  _pulseRangeMin = low;
-  _pulseRangeMax = high;
-  if (_pulseRangeMin < SERVO_PULSE_SAFETY_MIN) _pulseRangeMin = SERVO_PULSE_SAFETY_MIN;
-  if (_pulseRangeMax > SERVO_PULSE_SAFETY_MAX) _pulseRangeMax = SERVO_PULSE_SAFETY_MAX;
+  _pulseRangeMin = max(low,SERVO_PULSE_SAFETY_MIN);
+  _pulseRangeMax = min(high,SERVO_PULSE_SAFETY_MAX);
 }
 
 void ServoController::setHoldTime(int ms)
@@ -110,6 +114,10 @@ int ServoController::getPulse() {
 int ServoController::getPulseTarget() {
   return _pulseTarget;
 }
+void ServoController::setPulseTarget(int pulse) {
+  _pulseTarget = constrain(pulse, SERVO_PULSE_SAFETY_MIN, SERVO_PULSE_SAFETY_MAX);
+  _runningState=SERVO_RUNNING_STATE_MANUAL;
+}
 int ServoController::getPulseRangeMin() {
   return _pulseRangeMin;
 }
@@ -119,5 +127,5 @@ int ServoController::getPulseRangeMax() {
 void ServoController::applySettings(Settings *settings)
 {
   setPulseRange(settings->servo_min, settings->servo_max);
+  setHoldTime(settings->servo_hold_time);
 }
-
