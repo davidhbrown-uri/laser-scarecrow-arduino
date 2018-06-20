@@ -27,13 +27,12 @@
 class IrReflectanceSensor
 {
     static int _presentThreshold;
-    static int _absentThreshold;
+    static bool _disabled;
   public:
     static void init();
     static void setPresentThreshold(int value);
-    static void setAbsentThreshold(int value);
+    static void setDisabled(bool disabled);
     static bool isPresent();
-    static bool isAbsent();
     static int read();
 };
 #endif // not defined

@@ -10,33 +10,27 @@
 #include "config.h"
 
 int IrReflectanceSensor::_presentThreshold;
-int IrReflectanceSensor::_absentThreshold;
+bool IrReflectanceSensor::_disabled;
 
 void IrReflectanceSensor::init()
 {
   _presentThreshold = IR_REFLECTANCE_DEFAULT_PRESENT;
-  _absentThreshold = IR_REFLECTANCE_DEFAULT_ABSENT;
   pinMode(IR_REFLECTANCE_PIN, INPUT);
 }
 
-void IrReflectanceSensor::setAbsentThreshold(int value) {
-  _absentThreshold = value;
+void IrReflectanceSensor::setDisabled(bool disabled) {
+  _disabled = disabled;
 }
 void IrReflectanceSensor::setPresentThreshold(int value) {
   _presentThreshold = value;
 }
-bool IrReflectanceSensor::isAbsent() {
-#ifdef IR_REFLECTANCE_INVERT
-  return read() > _absentThreshold;
-#else
-  return read() < _absentThreshold;
-#endif
-}
+
 bool IrReflectanceSensor::isPresent() {
+  
 #ifdef IR_REFLECTANCE_INVERT
-  return read() <= _presentThreshold;
+  return !_disabled && read() <= _presentThreshold;
 #else
-  return read() >= _presentThreshold;
+  return !_disabled && read() >= _presentThreshold;
 #endif
 
 }
