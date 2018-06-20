@@ -320,7 +320,7 @@ void loop() { // put your main code here, to run repeatedly:
       }
       //update:
       //check for transition
-      if (IrReflectanceSensor::isAbsent())
+      if (!IrReflectanceSensor::isPresent())
       {
         stateCurrent = STATE_ACTIVE;
       }
@@ -483,7 +483,6 @@ void loop() { // put your main code here, to run repeatedly:
     Serial.print(F("\r\nIR raw="));
     Serial.print(IrReflectanceSensor::read());
     Serial.print(IrReflectanceSensor::isPresent() ? F(" Present;") : F(" not present;"));
-    Serial.print(IrReflectanceSensor::isAbsent() ? F(" absent") : F(" not absent"));
 #endif
 #ifdef DEBUG_AMBIENT
     Serial.print(F("Ambient light average="));
@@ -852,12 +851,10 @@ void findReflectanceThreshold() {
 #endif
 #endif
     IrReflectanceSensor::setPresentThreshold(value);
-    IrReflectanceSensor::setAbsentThreshold(value);
   }//!error
   else
   {
-    IrReflectanceSensor::setPresentThreshold(IR_REFLECTANCE_DO_NOT_USE_THRESHOLD);
-    IrReflectanceSensor::setAbsentThreshold(IR_REFLECTANCE_DO_NOT_USE_THRESHOLD);
+    IrReflectanceSensor::setDisabled(true);
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
     Serial.println(F("Laser will be enabled full circle!"));

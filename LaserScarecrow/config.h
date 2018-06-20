@@ -128,7 +128,7 @@
 //these 2017 values for black tape on white bucket:
 #define IR_REFLECTANCE_MID_READ_LIMIT 10
 #define IR_REFLECTANCE_DEFAULT_PRESENT 550
-#define IR_REFLECTANCE_DEFAULT_ABSENT 400
+//no longer used with better calibration algorithm: #define IR_REFLECTANCE_DEFAULT_ABSENT 400
 #define IR_REFLECTANCE_MINIMUM_CONTRAST 16
 //when seeking for the tape, the system will make
 //at most this many full rotations; if
@@ -152,7 +152,7 @@
 #define LOOP_SERIAL_OUTPUT_RATE 2000
 #define LOOPLED_RATE 1500
 //an out-of-range threshold value to ensure IR reflectance never is used
-#define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
+//DEPRECATED (use setDisabled() instead): #define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
 // flash or steady
 #define LASER_TOGGLE_WITH_INTERRUPT
 #define INTERRUPT_FREQUENCY_MIN 20
