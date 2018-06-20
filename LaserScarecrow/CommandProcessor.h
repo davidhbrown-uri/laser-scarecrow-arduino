@@ -21,6 +21,7 @@
 #include "Settings.h"
 #include "Command.h"
 #include "AmbientLightSensor.h"
+#include "IrReflectanceSensor.h"
 #include "StepperController.h"
 #include "ServoController.h"
 #include <uRTCLib.h>
@@ -46,6 +47,8 @@ extern bool stateManual;
 #define CPCODE_ServoMinimum 131
 #define CPCODE_ServoRange 132
 #define CPCODE_ServoTarget 133
+#define CPCODE_TapeSensed 150
+#define CPCODE_TapeSensor 151
 #define CPCODE_RtcControl 201
 #define CPCODE_LightSensorRead 210
 #define CPCODE_LightThrehold 221

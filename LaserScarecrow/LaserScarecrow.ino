@@ -40,6 +40,8 @@
 */
 byte stateCurrent, statePrevious;
 bool stateManual;
+unsigned long stateManualLaserOffCountdownMillis;
+bool stateManualLaserOffCountdownStarted = false;
 
 unsigned long loopLedLastChangeMillis = 0L;
 unsigned long loopProcessLastMillis = 0L;
@@ -100,7 +102,7 @@ void setup() {
   // check if clock is running
   rtc.refresh();
   rtc_last_second = rtc.second();
-  delay(1200);
+  delay(1200); 
   rtc.refresh();
   rtc_is_running = (rtc_last_second != rtc.second());
 #ifdef DEBUG_SERIAL
@@ -156,9 +158,9 @@ void setup() {
 
 void loop() { // put your main code here, to run repeatedly:
 
-/////// BEFORE any STATE
+  /////// BEFORE any STATE
 
-/// Check for settings changes:
+  /// Check for settings changes:
 #ifdef COMMAND_PROCESSOR_ENABLE_USB
   uProcessor.process();
 #endif
@@ -415,13 +417,25 @@ void loop() { // put your main code here, to run repeatedly:
         ServoController::runManually();
       } // enter code
       //manual behaviors
-      if (StepperController::getStepsToStep() == 0 && ServoController::getPulse() == ServoController::getPulseTarget())
-      {
-        LaserController::turnOff();
+      if (StepperController::getStepsToStep() == 0 // not rotating
+          && ServoController::getPulse() == ServoController::getPulseTarget() // not changing angle
+         )
+      { // turn laser off after delay
+        if (!stateManualLaserOffCountdownStarted) {
+          stateManualLaserOffCountdownMillis = millis();
+          stateManualLaserOffCountdownStarted = true;
+        } else {
+          if (millis() - stateManualLaserOffCountdownMillis >= STATE_MANUAL_LASER_OFF_DELAY_MS)
+          { 
+            LaserController::turnOff();
+            stateManualLaserOffCountdownStarted = false;
+          }
+        }
       }
       else
-      {
+      { // there is motion, so turn laser on. Cancel any countdown.
         LaserController::turnOn();
+        stateManualLaserOffCountdownStarted = false;
       }
       if (!stateManual) {
         stateCurrent = STATE_ACTIVE;
@@ -440,7 +454,7 @@ void loop() { // put your main code here, to run repeatedly:
   } // switch STATE
 
   ///////// AFTER ANY STATE:
-  
+
   // timing-imprecise tasks:
   LaserController::update();
   AmbientLightSensor::update();
@@ -453,11 +467,11 @@ void loop() { // put your main code here, to run repeatedly:
   }
   digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
 
-////////// DEBUG OUTPUT:
+  ////////// DEBUG OUTPUT:
 
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
-  if (outputSerialDebug) 
+  if (outputSerialDebug)
   {
     loopLastSerial = millis();
     Serial.println();
@@ -466,7 +480,7 @@ void loop() { // put your main code here, to run repeatedly:
     currentSettings.printToStream(&Serial);
 #endif
 #ifdef DEBUG_REFLECTANCE
-    Serial.print(F("IR raw="));
+    Serial.print(F("\r\nIR raw="));
     Serial.print(IrReflectanceSensor::read());
     Serial.print(IrReflectanceSensor::isPresent() ? F(" Present;") : F(" not present;"));
     Serial.print(IrReflectanceSensor::isAbsent() ? F(" absent") : F(" not absent"));

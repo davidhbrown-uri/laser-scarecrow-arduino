@@ -80,7 +80,14 @@ void CommandProcessor::process()
             stream->println(settings->servo_max - settings->servo_min);
             processOK();
             break;
-
+          case CPCODE_TapeSensed:
+            stream->println(IrReflectanceSensor::isPresent() ? 0 : 1);
+            processOK();
+            break;
+          case CPCODE_TapeSensor:
+            stream->println(IrReflectanceSensor::read());
+            processOK();
+            break;
           case CPCODE_RtcYmd:
             stream->print(rtc.year()); stream->print(' ');
             stream->print(rtc.month()); stream->print(' ');
@@ -182,7 +189,7 @@ void CommandProcessor::process()
             {
               /* @todo get limits from configuration */
               /* @todo rename Rate to Frequency */
-              settings->interrupt_frequency = constrain(command->parameter[0], INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+              settings->interrupt_frequency = map(command->parameter[0], 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
               processOK();
             } else
             {
@@ -226,7 +233,7 @@ void CommandProcessor::process()
           case CPCODE_ServoTarget:
             if (command->parameterCount == 1 && command->parameter[0] < 1024)
             {
-              ServoController::setPulseTarget( map(command->parameter[0], 0, 1023, 
+              ServoController::setPulseTarget( map(command->parameter[0], 0, 100, 
                   ServoController::getPulseRangeMin(), ServoController::getPulseRangeMax()));
               processOK();
             } else
