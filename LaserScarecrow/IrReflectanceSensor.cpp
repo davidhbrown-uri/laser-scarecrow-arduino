@@ -4,8 +4,8 @@
    Part of the URI Laser Scarecrow project
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
- */
- 
+*/
+
 #include "IrReflectanceSensor.h"
 #include "config.h"
 
@@ -26,10 +26,19 @@ void IrReflectanceSensor::setPresentThreshold(int value) {
   _presentThreshold = value;
 }
 bool IrReflectanceSensor::isAbsent() {
+#ifdef IR_REFLECTANCE_INVERT
+  return read() > _absentThreshold;
+#else
   return read() < _absentThreshold;
+#endif
 }
 bool IrReflectanceSensor::isPresent() {
-  return read() > _presentThreshold;
+#ifdef IR_REFLECTANCE_INVERT
+  return read() <= _presentThreshold;
+#else
+  return read() >= _presentThreshold;
+#endif
+
 }
 
 int IrReflectanceSensor::read()
