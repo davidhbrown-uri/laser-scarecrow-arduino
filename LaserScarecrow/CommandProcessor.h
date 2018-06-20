@@ -21,16 +21,34 @@
 #include "Settings.h"
 #include "Command.h"
 #include "AmbientLightSensor.h"
+#include "IrReflectanceSensor.h"
+#include "StepperController.h"
+#include "ServoController.h"
 #include <uRTCLib.h>
+// make a RTC class of my own?
 extern uRTCLib rtc;
 extern bool rtc_is_running;
+// same for the state?
+extern byte stateCurrent, statePrevious;
+extern bool stateManual;
 
 // until we do have a configuration object, we'll need access to values defined in:
 #include "config.h"
 
 #define CPCODE_Hello 0
+#define CPCODE_StateCurrent 10
+#define CPCODE_StateManual 11
 #define CPCODE_InterruptRate 101
-#define CPCODE_StepperTarget 111
+//anything related to angles needs to wait for absolute positioning hardware
+//#define CPCODE_StepperTargetAngle 111 
+#define CPCODE_StepperTargetMicrosteps 120
+#define CPCODE_StepperMicrostepPositive 121
+#define CPCODE_StepperMicrostepNegative 122
+#define CPCODE_ServoMinimum 131
+#define CPCODE_ServoRange 132
+#define CPCODE_ServoTarget 133
+#define CPCODE_TapeSensed 150
+#define CPCODE_TapeSensor 151
 #define CPCODE_RtcControl 201
 #define CPCODE_LightSensorRead 210
 #define CPCODE_LightThrehold 221
@@ -39,8 +57,6 @@ extern bool rtc_is_running;
 #define CPCODE_RtcRunning 259
 #define CPCODE_RtcWake 261
 #define CPCODE_RtcSleep 262
-#define CPCODE_ServoMinimum 131
-#define CPCODE_ServoRange 132
 
 
 enum CPSTATUS {

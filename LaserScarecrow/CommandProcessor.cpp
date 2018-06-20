@@ -50,12 +50,26 @@ void CommandProcessor::process()
           case CPCODE_Hello:
             processOK();
             break;
+          case CPCODE_StateCurrent:
+            stream->println(stateCurrent);
+            processOK();
+            break;
+          case CPCODE_StateManual:
+            stream->println(stateManual ? 1 : 0);
+            processOK();
+            break;
           case CPCODE_InterruptRate:
             stream->println(settings->interrupt_frequency);
             processOK();
             break;
-          case CPCODE_StepperTarget:
-            stream->println(settings->stepper_target);
+          /*
+            case CPCODE_StepperTargetAngle:
+            stream->println(settings->stepper_target);//NOT a setting; current state
+            processOK();
+            break;
+          */
+          case CPCODE_StepperTargetMicrosteps:
+            stream->println(StepperController::getStepsToStep());
             processOK();
             break;
           case CPCODE_ServoMinimum:
@@ -66,7 +80,14 @@ void CommandProcessor::process()
             stream->println(settings->servo_max - settings->servo_min);
             processOK();
             break;
-
+          case CPCODE_TapeSensed:
+            stream->println(IrReflectanceSensor::isPresent() ? 0 : 1);
+            processOK();
+            break;
+          case CPCODE_TapeSensor:
+            stream->println(IrReflectanceSensor::read());
+            processOK();
+            break;
           case CPCODE_RtcYmd:
             stream->print(rtc.year()); stream->print(' ');
             stream->print(rtc.month()); stream->print(' ');
@@ -111,6 +132,38 @@ void CommandProcessor::process()
         break; // case L (look / report)
       case 'S':
         switch (command->code) {
+          case CPCODE_StateManual: // request manual control
+            if (command->parameterCount == 1 && command->parameter[0] < 2)
+            {
+              stateManual = command->parameter[0] > 0;
+              processOK();
+            } else
+            {
+              processError(CPSTATUS_InvalidParameter);
+            }
+            break;
+          case CPCODE_StepperMicrostepPositive: // move this many steps forward
+            if (command->parameterCount == 1) // check that param0 is in integer range?
+            {
+              StepperController::setStepsToStep((int) command->parameter[0]);
+              processOK();
+            }
+            else
+            {
+              processError(CPSTATUS_InvalidParameter);
+            }
+            break;
+          case CPCODE_StepperMicrostepNegative: // move this many steps backward
+            if (command->parameterCount == 1) // check that param0 is in integer range?
+            {
+              StepperController::setStepsToStep(0 - (int) command->parameter[0]);
+              processOK();
+            }
+            else
+            {
+              processError(CPSTATUS_InvalidParameter);
+            }
+            break;
           case CPCODE_RtcControl: // rtc_control
             if (command->parameterCount == 1 && command->parameter[0] < 2)
             {
@@ -136,23 +189,25 @@ void CommandProcessor::process()
             {
               /* @todo get limits from configuration */
               /* @todo rename Rate to Frequency */
-              settings->interrupt_frequency = constrain(command->parameter[0], INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+              settings->interrupt_frequency = map(command->parameter[0], 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
               processOK();
             } else
             {
               processError(CPSTATUS_InvalidParameter);
             }
             break; //CPCODE_InterruptRate
-          case CPCODE_StepperTarget:
+          /*
+            case CPCODE_StepperTarget:
             if (command->parameterCount == 1)
             {
-              settings->stepper_target = command->parameter[0] % 360;
-              processOK();
+            settings->stepper_target = command->parameter[0] % 360;
+            processOK();
             } else
             {
-              processError(CPSTATUS_InvalidParameter);
+            processError(CPSTATUS_InvalidParameter);
             }
             break; //CPCODE_StepperTarget
+          */
           case CPCODE_ServoMinimum:
             if (command->parameterCount == 1 && command->parameter[0] < 1024)
             {
@@ -175,6 +230,17 @@ void CommandProcessor::process()
               processError(CPSTATUS_InvalidParameter);
             }
             break; //CPCODE_ServoRange
+          case CPCODE_ServoTarget:
+            if (command->parameterCount == 1 && command->parameter[0] < 1024)
+            {
+              ServoController::setPulseTarget( map(command->parameter[0], 0, 100, 
+                  ServoController::getPulseRangeMin(), ServoController::getPulseRangeMax()));
+              processOK();
+            } else
+            {
+              processError(CPSTATUS_InvalidParameter);
+            }
+            break;
           case CPCODE_RtcYmd:
             if (command->parameterCount > 2 && command->parameterCount < 4) {
               int year = command->parameter[0] % 100;

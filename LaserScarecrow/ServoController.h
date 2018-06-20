@@ -30,14 +30,17 @@ class ServoController
     static volatile int _pulseRangeMax;
     static unsigned long _millisBeginHold;
     static unsigned int _holdTimeMillis;
-  static unsigned int _runningState; public:
+    static unsigned int _runningState;
+  public:
     static void init();
     static void update();
     static void stop();
     static void run();
+    static void runManually();
     static bool isRunning();
     static void setPulseRange(int low, int high);
     static void setHoldTime(int ms);
+    static void setPulseTarget(int pulse);
     static int getPulse();
     static int getPulseTarget();
     static int getPulseRangeMin();

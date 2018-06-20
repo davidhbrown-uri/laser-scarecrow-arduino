@@ -54,7 +54,7 @@ void SettingsObserver::process()
        _settings.rtc_wake != currentSettings.rtc_wake ||
        _settings.rtc_sleep != currentSettings.rtc_sleep)
   {
-    //no controller / sensor needs updating for this
+    //no controller / sensor needs updating for this (yet; probably should)
     foundChanges = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
@@ -87,7 +87,10 @@ void SettingsObserver::process()
        || _settings.servo_max != currentSettings.servo_max
        || _settings.servo_hold_time != currentSettings.servo_hold_time)
   {
-    ServoController::applySettings(&currentSettings);
+    // these lines move the servo toward the min/max when settings change; useful for feat/16_bt_manual
+    if ( _settings.servo_min != currentSettings.servo_min) {ServoController::setPulseTarget(currentSettings.servo_min);}
+    if ( _settings.servo_max != currentSettings.servo_max) {ServoController::setPulseTarget(currentSettings.servo_max);}
+      ServoController::applySettings(&currentSettings);
     foundChanges = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
@@ -202,18 +205,18 @@ bool SettingsObserver::load(Settings *settings_ptr)
 }
 
 /**
- * The output of CRC32::calculate(settings_ptr, sizeof(*settings_ptr)) is NOT COMPATIBLE
- * with a CRC32 recalculated on the sequence of bytes saved by EEPROM.put(*settings_ptr).
- * This function does generate the same sequence of bytes and so the same checksum.
- * 
- * Hmm... looking at the source code for the CRC32 library at https://github.com/bakercp/CRC32/blob/master/src/CRC32.h
- * it looks like maybe for the size parameter, I should give 1, not the actual size which is
- * taken from the Type parameter once it works down to calling crc.update(data,size). 
- * Could be it was calculating the CRCs on 22*23 bytes of unknown data after my Settings object.
- * 
- * Need to get in the habit of reading other people's code when mine isn't working but I'm sure it should...
- * 
- */
+   The output of CRC32::calculate(settings_ptr, sizeof(*settings_ptr)) is NOT COMPATIBLE
+   with a CRC32 recalculated on the sequence of bytes saved by EEPROM.put(*settings_ptr).
+   This function does generate the same sequence of bytes and so the same checksum.
+
+   Hmm... looking at the source code for the CRC32 library at https://github.com/bakercp/CRC32/blob/master/src/CRC32.h
+   it looks like maybe for the size parameter, I should give 1, not the actual size which is
+   taken from the Type parameter once it works down to calling crc.update(data,size).
+   Could be it was calculating the CRCs on 22*23 bytes of unknown data after my Settings object.
+
+   Need to get in the habit of reading other people's code when mine isn't working but I'm sure it should...
+
+*/
 uint32_t SettingsObserver::settingsCRC(Settings *settings_ptr)
 {
 #ifdef DEBUG_SERIAL
@@ -239,7 +242,7 @@ uint32_t SettingsObserver::settingsCRC(Settings *settings_ptr)
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
   Serial.print(F("Checksum = 0x"));
-  Serial.println(checksum,HEX);
+  Serial.println(checksum, HEX);
 #endif
 #endif
   return checksum;

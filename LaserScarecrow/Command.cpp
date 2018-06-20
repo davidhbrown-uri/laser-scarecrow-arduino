@@ -196,16 +196,16 @@ void Command::printStatusToStream(Stream *stream_p)
 {
   switch (state) {
     case CSTATE_OK:
-      stream_p->println(F("ok"));
+      stream_p->println(F(" ok"));
       break;
     case CSTATE_ERROR:
     case CSTATE_ERROR_FLUSHING:
-      stream_p->print(F("error("));
+      stream_p->print(F(" error("));
       stream_p->print(errorCode);
       stream_p->println(')');
       break;
     default:
-      stream_p->print(F("other("));
+      stream_p->print(F(" other("));
       stream_p->print(state);
       stream_p->print(')');
   }

@@ -8,14 +8,19 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.3_0 - dev - feat/7_rtc")
+#define SOFTWARE_VERSION F("Version 1.4_0 - dev - feat/16_bt_manual")
 
 /*******************
    VERSION HISTORY
  *******************
-  1.3_0 - June 2018 - control of sleep/wake via RTC
 
-  1.2_9 - June 2018 - automatic save and load of settings from EEPROM
+  1.4_0 - June 2018 - branch feat/16_bt_manual add manual control state triggered by BT connection
+  
+  1.3_1 - June 2018 - branch develop - adjust servo settings for Futaba 1307S
+  
+  1.3_0 - June 2018 - branch feat/7_rtc control of sleep/wake via RTC
+
+  1.2_9 - June 2018 - branch feat/14_save_settings automatic save and load of settings from EEPROM
 
   1.2_8 - June 2018 - branch feat/8_Command
   . allow commands from Serial (USB) and Serial1 (Bluetooth)
@@ -87,20 +92,22 @@
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
 #define LASER_DUTYCYCLERUNTIME 1800000
 #define LASER_DUTYCYCLECOOLDOWN 300000
-// the ms ranges should be determined for each model of servo used
-// MG90s purchased in 2017: control range apx 0.7ms (700µs) to 2.3ms
-// 1ms to 2ms resulted in 90-degree movement
-// Mount horn on left because lower values rotate further clockwise.
-// Mount arm on horn so that 1ms points down and 2ms points back across the servo case.
-// Pulse time units are in µs
-#define SERVO_PULSE_SAFETY_MIN 700
-#define SERVO_PULSE_SAFETY_MAX 2300
-#define SERVO_PULSE_USABLE_MIN 1000
-#define SERVO_PULSE_USABLE_MAX 2000
+// Pulse time units are in µs; ranges should be determined for each model of servo used
+// (Angle is too imprecise)
+// 2017: MG90s purchased in 2017: control range apx 700µs to 2300µs
+// 2017: 1ms to 2ms resulted in 90-degree movement
+// 2017: Mounted horn on left because lower values rotate further clockwise.
+// 2017: Mounted arm on horn so that 1ms points down and 2ms points back across the servo case.
+// 2018: Futaba 1307S: control range apx 700µs to 2300µs
+// 2018: Horn mounted on right; minimum angle = flat across top of crop; 
+// 2018:   increasing / maximum angle points down into canopy
+// 2018: Futaba S1307: useful range apx 560µs to 2050µs; movemen
+// 2018: Futaba S1307: movement stops (before physical limits) at 550µs, 2400µs
+#define SERVO_PULSE_SAFETY_MIN 550
+#define SERVO_PULSE_SAFETY_MAX 2400
+#define SERVO_PULSE_USABLE_MIN 560
+#define SERVO_PULSE_USABLE_MAX 2050
 #define SERVO_PULSE_DELTA_LIMIT 5
-//SERVO ANGLE superseded by servo pulse
-//#define SERVO_ANGLE_LOW_LIMIT 90
-//#define SERVO_ANGLE_HIGH_LIMIT 170
 
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
 // these adjust the rate of updates
@@ -149,6 +156,7 @@
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
 //for testing, save settings 30000 ms (30 seconds) after last change; change to 300000 (5 minutes) for release
 #define SETTINGSOBSERVER_SAVE_AFTER_MS 30000
+#define STATE_MANUAL_LASER_OFF_DELAY_MS 15000
 
 /*************
  * Software configuration
@@ -162,10 +170,6 @@
 #define COMMAND_PROCESSOR_ENABLE_BLUETOOTH
 #define COMMAND_PROCESSOR_STREAM_BLUETOOTH Serial1
 #define COMMAND_PROCESSOR_DATARATE_BLUETOOTH 38400
-#define BT_PIN_RXD 1
-#define BT_PIN_TXD 0
-#define BT_PIN_STATE 5
-
 
 /***********************
  * Arduino / pin assignments
@@ -189,10 +193,14 @@
 
 #define IR_REFLECTANCE_PIN A10
 
-// Bluetooth is on Serial1 at pins 0/1
-
 #define RTC_PIN_SDA 2
 #define RTC_PIN_SCL 3
+
+// Bluetooth is on Serial1 at pins 0/1
+// also have to initialize the pins in setup:
+#define BT_PIN_RXD 1
+#define BT_PIN_TXD 0
+#define BT_PIN_STATE 5
 
 //The stepper must be controlled via an Allegro A4988
 //driver such as https://www.pololu.com/product/1182
@@ -221,19 +229,20 @@
 #define DEBUG_SERIAL
 #define DEBUG_SERIAL_DATARATE 57600
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 4000
-#define DEBUG_SERIAL_COUNTDOWN_SECONDS 6
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 4
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
-//#define DEBUG_REFLECTANCE
+#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
-#define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
-#define DEBUG_SETTINGSOBSERVER
+//#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY
-#define DEBUG_RTC
+//#define DEBUG_RTC
+//#define DEBUG_BLUETOOTH
