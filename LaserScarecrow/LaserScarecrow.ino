@@ -482,7 +482,12 @@ void loop() { // put your main code here, to run repeatedly:
 #ifdef DEBUG_REFLECTANCE
     Serial.print(F("\r\nIR raw="));
     Serial.print(IrReflectanceSensor::read());
-    Serial.print(IrReflectanceSensor::isPresent() ? F(" Present;") : F(" not present;"));
+    if(IrReflectanceSensor::isDisabled) {
+      Serial.println(F(" (disabled)"));
+    } else
+    {
+      Serial.println(IrReflectanceSensor::isPresent() ? F(" (tape present)") : F(" (no tape)"));
+    }
 #endif
 #ifdef DEBUG_AMBIENT
     Serial.print(F("Ambient light average="));
@@ -514,15 +519,16 @@ void loop() { // put your main code here, to run repeatedly:
 #ifdef DEBUG_RTC
     rtc.refresh();
 
-    Serial.print(F("\r\nRTC DateTime: "));
-    Serial.print(rtc.year());
-    Serial.print('/');
-    Serial.print(rtc.month());
-    Serial.print('/');
-    Serial.print(rtc.day());
+//    Serial.print(F("\r\nRTC DateTime: "));
+//    Serial.print(rtc.year());
+//    Serial.print('/');
+//    Serial.print(rtc.month());
+//    Serial.print('/');
+//    Serial.print(rtc.day());
 
-    Serial.print(' ');
-
+//    Serial.print(' ');
+// really we care only about the time:
+    Serial.print(F("\r\nRTC time: "));
     Serial.print(rtc.hour());
     Serial.print(':');
     Serial.print(rtc.minute());

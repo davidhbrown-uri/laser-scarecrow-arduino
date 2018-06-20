@@ -33,6 +33,7 @@ class IrReflectanceSensor
     static void setPresentThreshold(int value);
     static void setDisabled(bool disabled);
     static bool isPresent();
+    static bool isDisabled();
     static int read();
 };
 #endif // not defined

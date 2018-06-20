@@ -34,6 +34,9 @@ bool IrReflectanceSensor::isPresent() {
 #endif
 
 }
+bool IrReflectanceSensor::isDisabled() {
+  return _disabled;
+}
 
 int IrReflectanceSensor::read()
 {
