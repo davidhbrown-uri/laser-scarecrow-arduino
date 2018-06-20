@@ -8,11 +8,13 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.0_rc2 - Version 2 Release Candidate 2 - rc/v2_rc2")
+#define SOFTWARE_VERSION F("Version 2.0.0 - Version 2 Release")
 
 /*******************
    VERSION HISTORY
  *******************
+
+  2.0.0 - Tweaked a few minor things
 
   2.0_rc2 - June 20, 2018 - release candidate 2
 
