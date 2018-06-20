@@ -32,7 +32,8 @@ void CommandProcessor::setSettings(Settings *stgs)
 void CommandProcessor::setStream(Stream *st)
 {
   stream = st;
-  stream->println(F("Laser Scarecrow Command Processor Ready!"));
+  //stream->println(F("Laser Scarecrow Command Processor Ready!"));
+  //this was silly; we don't know there's anyone listening yet.
 }
 
 void CommandProcessor::process()
@@ -48,6 +49,8 @@ void CommandProcessor::process()
         stream->print(' ');
         switch (command->code) {
           case CPCODE_Hello:
+            stream->print(SOFTWARE_VERSION);
+            stream->print(' ');
             processOK();
             break;
           case CPCODE_StateCurrent:

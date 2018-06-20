@@ -199,6 +199,7 @@ bool SettingsObserver::load(Settings *settings_ptr)
 #endif
 #endif
       *settings_ptr = tmpSettings; // shallow copy
+      _settings = tmpSettings; // so we don't try to save what was just loaded! 
     }
   } // if successfully loaded the header
   return success;

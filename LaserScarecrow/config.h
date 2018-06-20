@@ -8,11 +8,15 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 1.4_0 - dev - feat/16_bt_manual")
+#define SOFTWARE_VERSION F("Version 2.0_rc2 - Version 2 Release Candidate 2 - rc/v2_rc2")
 
 /*******************
    VERSION HISTORY
  *******************
+
+  2.0_rc2 - June 20, 2018 - release candidate 2
+
+  2.0_rc1 - release candidate 1 - still had a bug in inverted tape sensor
 
   1.4_1 - June 2018 - branch feat/1_invert_tape_sensor (via #define in config.ini)
   
@@ -160,8 +164,9 @@
 // these thresholds will be raw values when using AnalogInput
 #define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 20
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
-//for testing, save settings 30000 ms (30 seconds) after last change; change to 300000 (5 minutes) for release
-#define SETTINGSOBSERVER_SAVE_AFTER_MS 30000
+//for testing, save settings 30000 ms (30 seconds) after last change; change to 100000 (100 seconds; we're telling them 2 minutes) for release
+#define SETTINGSOBSERVER_SAVE_AFTER_MS 100000
+//laser will stay on this long after movement in manual mode
 #define STATE_MANUAL_LASER_OFF_DELAY_MS 15000
 
 /*************
@@ -234,21 +239,21 @@
  */
 #define DEBUG_SERIAL
 #define DEBUG_SERIAL_DATARATE 57600
-#define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 4000
+#define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
 #define DEBUG_SERIAL_COUNTDOWN_SECONDS 4
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
 #define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
-//#define DEBUG_SETTINGS
+#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
-//#define DEBUG_SETTINGSOBSERVER
+#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY
-//#define DEBUG_RTC
+#define DEBUG_RTC
 //#define DEBUG_BLUETOOTH
