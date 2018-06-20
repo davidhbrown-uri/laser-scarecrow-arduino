@@ -1,4 +1,12 @@
 /*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+ */
+ 
+/*
   Design used small CdS photocells with a resistance of around
   2.4k in room light (~170 lux), a bit under 100 ohms directly
   under a lamp, and over 140k in the shadow of a cupped hand.
@@ -17,6 +25,9 @@
 #include "WProgram.h"
 #endif
 
+#include "Settings.h"
+extern Settings currentSettings;
+
 class AmbientLightSensor
 {
     static int _threshold, _average, _readingsIndex;
@@ -27,6 +38,7 @@ class AmbientLightSensor
     static void update();
     static int read();
     static void setThreshold(int value);
+    static void applySettings(Settings *settings);
     static bool isDark();
     static bool isLight();
 };

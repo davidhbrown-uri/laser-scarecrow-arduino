@@ -1,27 +1,41 @@
+/*
+
+   License GPL-2.0
+   Part of the URI Laser Scarecrow project
+   https://github.com/davidhbrown-uri/laser-scarecrow-arduino
+
+*/
+
 #include "IrReflectanceSensor.h"
 #include "config.h"
 
 int IrReflectanceSensor::_presentThreshold;
-int IrReflectanceSensor::_absentThreshold;
+bool IrReflectanceSensor::_disabled;
 
 void IrReflectanceSensor::init()
 {
   _presentThreshold = IR_REFLECTANCE_DEFAULT_PRESENT;
-  _absentThreshold = IR_REFLECTANCE_DEFAULT_ABSENT;
   pinMode(IR_REFLECTANCE_PIN, INPUT);
 }
 
-void IrReflectanceSensor::setAbsentThreshold(int value) {
-  _absentThreshold = value;
+void IrReflectanceSensor::setDisabled(bool disabled) {
+  _disabled = disabled;
 }
 void IrReflectanceSensor::setPresentThreshold(int value) {
   _presentThreshold = value;
 }
-bool IrReflectanceSensor::isAbsent() {
-  return read() < _absentThreshold;
-}
+
 bool IrReflectanceSensor::isPresent() {
-  return read() > _presentThreshold;
+  
+#ifdef IR_REFLECTANCE_INVERT
+  return !_disabled && read() <= _presentThreshold;
+#else
+  return !_disabled && read() >= _presentThreshold;
+#endif
+
+}
+bool IrReflectanceSensor::isDisabled() {
+  return _disabled;
 }
 
 int IrReflectanceSensor::read()
