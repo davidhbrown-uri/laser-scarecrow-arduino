@@ -14,6 +14,8 @@
    VERSION HISTORY
  *******************
 
+  1.4_1 - June 2018 - branch feat/1_invert_tape_sensor (via #define in config.ini)
+  
   1.4_0 - June 2018 - branch feat/16_bt_manual add manual control state triggered by BT connection
   
   1.3_1 - June 2018 - branch develop - adjust servo settings for Futaba 1307S
@@ -133,6 +135,10 @@
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
 #define SEEKING_ROTATION_LIMIT 2
+// to use reflective tape on a non-reflective (black) bucket (e.g., 2018 kits),
+// invert the logic of the isPresent, isAbsent tests (leave actual values alone):
+#define IR_REFLECTANCE_INVERT
+
 //how often the RTC should refresh
 #define RTC_REFRESH_MILLIS 2000
 
