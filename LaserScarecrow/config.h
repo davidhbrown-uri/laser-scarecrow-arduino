@@ -1,5 +1,4 @@
 /*
-
    License GPL-2.0
    Part of the URI Laser Scarecrow project
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
@@ -8,12 +7,12 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.0.0 - Version 2 Release")
+#define SOFTWARE_VERSION F("Version 2.0.0a - Version 2 Release")
 
 /*******************
    VERSION HISTORY
  *******************
-
+  2.0.0a - disabled LASER_TOGGLE_WITH_INTERRUPT
   2.0.0 - Tweaked a few minor things
 
   2.0_rc2 - June 20, 2018 - release candidate 2
@@ -160,7 +159,7 @@
 //an out-of-range threshold value to ensure IR reflectance never is used
 //DEPRECATED (use setDisabled() instead): #define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
 // flash or steady
-#define LASER_TOGGLE_WITH_INTERRUPT
+//#define LASER_TOGGLE_WITH_INTERRUPT
 #define INTERRUPT_FREQUENCY_MIN 20
 #define INTERRUPT_FREQUENCY_MAX 150
 // these thresholds will be raw values when using AnalogInput
