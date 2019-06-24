@@ -88,8 +88,9 @@ void SettingsObserver::process()
        || _settings.servo_hold_time != currentSettings.servo_hold_time)
   {
     // these lines move the servo toward the min/max when settings change; useful for feat/16_bt_manual
+    //only ever seeing the max. Try if/else?
     if ( _settings.servo_min != currentSettings.servo_min) {ServoController::setPulseTarget(currentSettings.servo_min);}
-    if ( _settings.servo_max != currentSettings.servo_max) {ServoController::setPulseTarget(currentSettings.servo_max);}
+    else if ( _settings.servo_max != currentSettings.servo_max) {ServoController::setPulseTarget(currentSettings.servo_max);}
       ServoController::applySettings(&currentSettings);
     foundChanges = true;
 #ifdef DEBUG_SERIAL

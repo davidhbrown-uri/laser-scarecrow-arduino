@@ -403,6 +403,9 @@ void loop() { // put your main code here, to run repeatedly:
         //exit code:
       }
       break;
+      /**************************
+       * MANUAL
+       ************************/
     case STATE_MANUAL:
       if (stateCurrent != statePrevious) {
         statePrevious = stateCurrent;

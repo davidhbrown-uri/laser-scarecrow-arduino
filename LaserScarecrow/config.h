@@ -7,11 +7,12 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.0.0a - Version 2 Release")
+#define SOFTWARE_VERSION F("Version 2.0.1 - Version 2 Release")
 
 /*******************
    VERSION HISTORY
  *******************
+  2.0.1 - fix issue #28 - servo motion stops when angle adjusted via knob; added manual servo hold timeout
   2.0.0a - disabled LASER_TOGGLE_WITH_INTERRUPT
   2.0.0 - Tweaked a few minor things
 
@@ -166,7 +167,10 @@
 #define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 20
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
 //for testing, save settings 30000 ms (30 seconds) after last change; change to 100000 (100 seconds; we're telling them 2 minutes) for release
-#define SETTINGSOBSERVER_SAVE_AFTER_MS 100000
+//that long a delay was obnoxious. Changed to 15 seconds.
+#define SETTINGSOBSERVER_SAVE_AFTER_MS 15000
+//exit servo manual hold after this time elapsed; probably convenient to have same as save time to indicate when the settings are saved
+#define SERVO_MANUAL_HOLD_MS 15000
 //laser will stay on this long after movement in manual mode
 #define STATE_MANUAL_LASER_OFF_DELAY_MS 15000
 
@@ -245,7 +249,7 @@
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
-#define DEBUG_REFLECTANCE
+//#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
 #define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
@@ -256,5 +260,5 @@
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY
-#define DEBUG_RTC
+//#define DEBUG_RTC
 //#define DEBUG_BLUETOOTH

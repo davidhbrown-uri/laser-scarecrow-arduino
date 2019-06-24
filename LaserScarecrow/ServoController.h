@@ -31,6 +31,7 @@ class ServoController
     static unsigned long _millisBeginHold;
     static unsigned int _holdTimeMillis;
     static unsigned int _runningState;
+    static void _move();
   public:
     static void init();
     static void update();
@@ -49,4 +50,3 @@ class ServoController
 };
 
 #endif
-
