@@ -18,7 +18,7 @@
 #ifndef IR_REFLECTANCE_SENSOR_h
 #define IR_REFLECTANCE_SENSOR_h
 #if defined(ARDUINO) && ARDUINO >= 100
-#include "arduino.h"
+#include "Arduino.h"
 #else
 #include "WProgram.h"
 #endif
