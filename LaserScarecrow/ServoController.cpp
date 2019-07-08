@@ -32,6 +32,7 @@ void ServoController::init() {
   _pulse = (_pulseRangeMin + _pulseRangeMax ) / 2;
   _pulseTarget = _pulse;
   _running = false;
+  _millisBeginHold=0L;
   _runningState = SERVO_RUNNING_STATE_SEEKING;
 }
 void ServoController::update()
@@ -41,21 +42,21 @@ void ServoController::update()
     switch (_runningState)
     {
       case SERVO_RUNNING_STATE_SEEKING:
+        _move();
         if (_pulse == _pulseTarget)
         {
           _runningState = SERVO_RUNNING_STATE_HOLDING;
           _millisBeginHold = millis();
           _servo.detach();
         }
-        //if, not else: we want to fall through to this
+        break;
       case SERVO_RUNNING_STATE_MANUAL: //manual never holds so never picks a new value
-        if (_pulse != _pulseTarget)
+        _move();
+          //added manual hold timeout to fix issue #28
+         if ((millis() - _millisBeginHold) > SERVO_MANUAL_HOLD_MS)
         {
-          int delta = _pulseTarget - _pulse;
-          delta = max(-SERVO_PULSE_DELTA_LIMIT, delta);
-          delta = min(SERVO_PULSE_DELTA_LIMIT, delta);
-          _pulse += delta;
-          _servo.writeMicroseconds(_pulse);
+          //exit manual hold
+          _runningState = SERVO_RUNNING_STATE_SEEKING;
         }
         break;
       case SERVO_RUNNING_STATE_HOLDING:
@@ -68,10 +69,19 @@ void ServoController::update()
         }
         break;
       default: //shouldn't happen, but just in case...
-        _runningState = SERVO_RUNNING_STATE_HOLDING;
+        init();
     }
 
   } // if running
+}
+void ServoController::_move() {
+  if (_pulse != _pulseTarget) {
+      int delta = _pulseTarget - _pulse;
+      delta = max(-SERVO_PULSE_DELTA_LIMIT, delta);
+      delta = min(SERVO_PULSE_DELTA_LIMIT, delta);
+      _pulse += delta;
+      _servo.writeMicroseconds(_pulse);
+  }
 }
 void ServoController::stop()
 {
@@ -116,7 +126,9 @@ int ServoController::getPulseTarget() {
 }
 void ServoController::setPulseTarget(int pulse) {
   _pulseTarget = constrain(pulse, SERVO_PULSE_SAFETY_MIN, SERVO_PULSE_SAFETY_MAX);
-  _runningState=SERVO_RUNNING_STATE_MANUAL;
+  //added manual hold timeout to fix issue #28
+  _millisBeginHold = millis();
+  _runningState=SERVO_RUNNING_STATE_MANUAL;//this alone was causing issue #28; entered manual and never left.
 }
 int ServoController::getPulseRangeMin() {
   return _pulseRangeMin;
