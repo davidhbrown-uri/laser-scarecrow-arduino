@@ -207,6 +207,7 @@ void loop() { // put your main code here, to run repeatedly:
       Serial.begin(DEBUG_SERIAL_DATARATE);
       if (serialCanWrite) Serial.println();
       for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--) {
+        serialCanWrite = Serial && Serial.availableForWrite() > 16;
         if(serialCanWrite) {
           Serial.print(F("Laser Scarecrow Startup in "));
           Serial.print(i);
@@ -358,6 +359,9 @@ void loop() { // put your main code here, to run repeatedly:
       if (!IrReflectanceSensor::isPresent())
       {
         stateCurrent = STATE_ACTIVE;
+        // force some forward movement to avoid lots of chattering at trailing edge of tape
+        // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
+        StepperController::setStepsToStep(random(currentSettings.stepper_randomsteps_max,currentSettings.stepper_randomsteps_max*1.5));
       }
       //do our things:
       if (StepperController::getStepsToStep() == 0)
@@ -520,7 +524,7 @@ void loop() { // put your main code here, to run repeatedly:
 #ifdef DEBUG_REFLECTANCE
     Serial.print(F("\r\nIR raw="));
     Serial.print(IrReflectanceSensor::read());
-    if(IrReflectanceSensor::isDisabled) {
+    if(IrReflectanceSensor::isDisabled()) {
       Serial.println(F(" (disabled)"));
     } else
     {
@@ -751,7 +755,7 @@ void findReflectanceThreshold() {
       if (value < lowest) {
         lowest = value;
       }
-      StepperController::setStepsToStep(4);
+      StepperController::setStepsToStep(-4);// move backwards to make this behavior easier to see/understand
       while (StepperController::getStepsToStep() != 0) { ; }
     } // steps while fullstepping around
 #ifdef DEBUG_SERIAL
@@ -947,13 +951,122 @@ if(serialCanWrite) {
 #endif
     IrReflectanceSensor::setPresentThreshold(value);
   }//!error
-  
+  IrReflectanceSensor::setDisabled(error);
+  if (!error) {
+    // find shortest usable span (issue #32)
+      int span = findShortestUsableSpan();
+      if(span>0) {
+        currentSettings.stepper_randomsteps_max = span / 2; // half the smallest span forwards
+        currentSettings.stepper_randomsteps_min = span * -5 / 7; // 70% of that backwards
+      }
+  }//!error 
   if(error) {
-    IrReflectanceSensor::setDisabled(true);
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-    if (serialCanWrite) Serial.println(F("Laser will be enabled full circle!"));
+    if (serialCanWrite) {Serial.println(F("Laser will be enabled full circle!"));}
 #endif
 #endif
   }
 } // findReflectanceThreshold
+
+// attempts to find the shortest usable span to better set random stepping
+// if returned value <=0, then do not set stepping range; unable to determine appropriate value
+// See github issue #23
+int findShortestUsableSpan() {
+  // MATCH_STEPS determined experimentally to help ignore jitter in readings
+#define MATCH_STEPS 10
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.println(F("Looking for shortest usable span")); }
+#endif
+#endif
+    int stepsInCircle = STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR;
+    int shortestSpan = STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR; //full circle
+    bool currentStepIsPresent, previousStepIsPresent = IrReflectanceSensor::isPresent();
+    //first, find some tape, moving forward
+    long stepsStepped = 0L;
+    int matchingStepCount = 0;
+    while(matchingStepCount < MATCH_STEPS && stepsStepped < STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR) {
+      StepperController::setStepsToStep(1);
+      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      stepsStepped++;
+      currentStepIsPresent=IrReflectanceSensor::isPresent();
+      if(currentStepIsPresent && previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
+      previousStepIsPresent=currentStepIsPresent;
+    }
+    if (stepsStepped > stepsInCircle) return -1; //could not find tape
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.println(F("Found tape")); }
+#endif
+#endif
+    //second, find the end of the tape, moving backward (to make behavior easier to recognize)
+    stepsStepped = 0L;
+    matchingStepCount = 0;
+    while(matchingStepCount < MATCH_STEPS && stepsStepped < stepsInCircle) {
+      StepperController::setStepsToStep(-1);
+      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      stepsStepped++;
+      currentStepIsPresent=IrReflectanceSensor::isPresent();
+      if(!currentStepIsPresent && !previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
+      previousStepIsPresent=currentStepIsPresent;
+    }
+    if (stepsStepped > stepsInCircle) return -2; //could not find end of tape
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.print(F("Found end of tape")); }
+#endif
+#endif
+   bool inUsableSpan=true;
+   int spanLength = matchingStepCount;// we already saw this many usable steps
+   //cover the rest of the circle, still moving backward
+   matchingStepCount = 0;
+   for(int i = spanLength; i < stepsInCircle; i++) {
+      StepperController::setStepsToStep(-1);
+      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      currentStepIsPresent=IrReflectanceSensor::isPresent();
+      if(currentStepIsPresent == previousStepIsPresent) { matchingStepCount++; } else {matchingStepCount = 0; }
+      previousStepIsPresent=currentStepIsPresent;
+      if(inUsableSpan) {
+        if(currentStepIsPresent && matchingStepCount >= MATCH_STEPS) { // back to tape
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.print(F("Found end of span with length = ")); Serial.println(spanLength); }
+#endif
+#endif
+      if(spanLength>2*MATCH_STEPS) { // don't count very short spans toward shortest
+        shortestSpan=min(shortestSpan,spanLength);
+      }
+      inUsableSpan=false;
+      } // found tape
+      else {
+        spanLength++;
+      }// still in usable span
+   } // if inUsableSpan
+   else { // on tape
+    if(!currentStepIsPresent && matchingStepCount >= 2) { // back to span
+      spanLength=matchingStepCount;
+      inUsableSpan=true;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.print(F("Found beginning of another span")); Serial.println(spanLength); }
+#endif
+#endif    
+      } // if we found another span
+    } // else not in span
+   }//for steps around the circle
+  if(inUsableSpan) { // shouldn't happen at end of circle, but maybe?
+    shortestSpan=min(shortestSpan,spanLength);
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.print(F("Ended on span with length = ")); Serial.println(spanLength); }
+#endif
+#endif
+  }
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if(serialCanWrite) { Serial.print(F("Shortest meaningful span is = ")); Serial.println(shortestSpan); }
+#endif
+#endif
+  return shortestSpan;
+} // function findShortestUsableSpan

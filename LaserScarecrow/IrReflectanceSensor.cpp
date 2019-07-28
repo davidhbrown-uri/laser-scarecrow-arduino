@@ -42,5 +42,3 @@ int IrReflectanceSensor::read()
 {
   return analogRead(IR_REFLECTANCE_PIN);
 }
-
-
