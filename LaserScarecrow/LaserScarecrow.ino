@@ -26,21 +26,22 @@
 // definitions for finite state machine
 // STATE_CONTINUE can be used to indicate that the current state should be continued
 #define STATE_CONTINUE 0
-#define STATE_POWERON 1
-#define STATE_INIT 2
-#define STATE_ACTIVE 3
-#define STATE_SEEKING 4
-#define STATE_DARK 5
-#define STATE_COOLDOWN 6
-#define STATE_MANUAL 7
+#define STATE_POWERON 10
+#define STATE_INIT 20
+#define STATE_INIT_REFLECTANCE 36
+#define STATE_ACTIVE 30
+#define STATE_SEEKING 40
+#define STATE_DARK 50
+#define STATE_COOLDOWN 60
+#define STATE_MANUAL 99
 
 
 /*****************
    GLOBALS
 */
 byte stateCurrent, statePrevious;
-bool stateManual;
-unsigned long stateManualLaserOffCountdownMillis;
+bool stateManual=false, serialCanWrite=false;
+unsigned long stateManualLaserOffCountdownMillis, stateInitReflectanceMillis;
 bool stateManualLaserOffCountdownStarted = false;
 
 unsigned long loopLedLastChangeMillis = 0L;
@@ -99,18 +100,6 @@ void setup() {
 
   // Wire and RTC
   Wire.begin();
-  // check if clock is running
-  rtc.refresh();
-  rtc_last_second = rtc.second();
-  delay(1200); 
-  rtc.refresh();
-  rtc_is_running = (rtc_last_second != rtc.second());
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_RTC
-  Serial.print(F("RTC at startup is "));
-  Serial.println(rtc_is_running ? F("running") : F("STOPPED"));
-#endif
-#endif
 
   pinMode(BT_PIN_STATE, INPUT);
 
@@ -160,6 +149,9 @@ void loop() { // put your main code here, to run repeatedly:
 
   /////// BEFORE any STATE
 
+#ifdef DEBUG_SERIAL
+  serialCanWrite = Serial && Serial.availableForWrite() > 16;
+#endif
   /// Check for settings changes:
 #ifdef COMMAND_PROCESSOR_ENABLE_USB
   uProcessor.process();
@@ -213,11 +205,13 @@ void loop() { // put your main code here, to run repeatedly:
       StepperController::stop();
 #ifdef DEBUG_SERIAL
       Serial.begin(DEBUG_SERIAL_DATARATE);
-      Serial.println();
+      if (serialCanWrite) Serial.println();
       for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--) {
-        Serial.print(F("Laser Scarecrow Startup in "));
-        Serial.print(i);
-        Serial.println(F("..."));
+        if(serialCanWrite) {
+          Serial.print(F("Laser Scarecrow Startup in "));
+          Serial.print(i);
+          Serial.println(F("..."));
+        }
         delay(1000);
       }
 #endif // DEBUG_SERIAL
@@ -232,19 +226,19 @@ void loop() { // put your main code here, to run repeatedly:
         statePrevious = stateCurrent;
         // onEnter code:
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering INIT State]]"));
-#endif // DEBUG_SERIAL
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering INIT State]]"));
+#endif 
         if (SettingsObserver::load(&currentSettings))
         {
 #ifdef DEBUG_SERIAL
-          Serial.println(F("Loaded settings from storage."));
+          if (serialCanWrite) Serial.println(F("Loaded settings from storage."));
 #endif
           ;
         }
         else
         {
 #ifdef DEBUG_SERIAL
-          Serial.println(F("Could not load settings from storage."));
+          if (serialCanWrite) Serial.println(F("Could not load settings from storage."));
 #endif
           ;
         }
@@ -254,15 +248,53 @@ void loop() { // put your main code here, to run repeatedly:
         IrReflectanceSensor::init();
         AmbientLightSensor::init();
         Interrupt::init();
-        findReflectanceThreshold();
-      }
+  // check if clock is running
+  rtc.refresh();
+  rtc_last_second = rtc.second();
+  delay(1200); 
+  rtc.refresh();
+  rtc_is_running = (rtc_last_second != rtc.second());
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_RTC
+  if (serialCanWrite) {
+    Serial.print(F("RTC at startup is "));
+    Serial.println(rtc_is_running ? F("running") : F("STOPPED"));
+  }
+#endif
+#endif      
+}// finish enter code
       //update:
-      stateCurrent = STATE_DARK;
+      stateCurrent = STATE_INIT_REFLECTANCE;
       if (stateCurrent != statePrevious) {
         //exit code:
       }
       break;
 
+    /*********************
+     INIT_REFLECTANCE
+     *********************/
+     case STATE_INIT_REFLECTANCE:
+      if (stateCurrent != statePrevious) {
+        statePrevious = stateCurrent;
+        //enter code:
+#ifdef DEBUG_SERIAL
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering INIT_REFLECTANCE State]]"));
+#endif 
+        LaserController::turnOff();
+        LaserController::update();// because this operation isn't looping
+        ServoController::stop();
+        StepperController::stop();
+        Interrupt::applySettings(& currentSettings);
+        //laser is on here
+      }//end enter code
+      // do/ :
+      findReflectanceThreshold();
+      stateCurrent = STATE_DARK;
+      if (stateCurrent != statePrevious) {
+        //exit code:
+        stateInitReflectanceMillis = millis();
+      }
+      break;
     /*********************
       ACTIVE
     *********************/
@@ -271,7 +303,7 @@ void loop() { // put your main code here, to run repeatedly:
         statePrevious = stateCurrent;
         //enter code:
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering ACTIVE State]]"));
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering ACTIVE State]]"));
 #endif // DEBUG_SERIAL
         Interrupt::applySettings(& currentSettings);
         LaserController::turnOn();
@@ -283,6 +315,9 @@ void loop() { // put your main code here, to run repeatedly:
       }
       //update:
       // check for transition events (later checks have priority)
+      if (millis()-stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS) {
+        stateCurrent = STATE_INIT_REFLECTANCE;
+      }
       if (IrReflectanceSensor::isPresent()) stateCurrent = STATE_SEEKING;
       if (LaserController::isCoolingDown()) stateCurrent = STATE_COOLDOWN;
       if (rtc_is_running && currentSettings.rtc_control)
@@ -309,14 +344,14 @@ void loop() { // put your main code here, to run repeatedly:
       if (stateCurrent != statePrevious) { // onEntry
         statePrevious = stateCurrent;
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering SEEKING State]]"));
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
         Interrupt::applySettings(& currentSettings);
         LaserController::turnOff();
         ServoController::stop();
         StepperController::runFullstep();
         StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
-        seekingRotationLimitCountdown = SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
+        seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
       }
       //update:
       //check for transition
@@ -332,7 +367,7 @@ void loop() { // put your main code here, to run repeatedly:
       }
       if (seekingRotationLimitCountdown == 0)
       {
-        stateCurrent = STATE_INIT;
+        stateCurrent = STATE_INIT_REFLECTANCE;
       }
       if (stateManual) {
         stateCurrent = STATE_MANUAL;
@@ -349,7 +384,7 @@ void loop() { // put your main code here, to run repeatedly:
         statePrevious = stateCurrent;
         //enter code:
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering DARK State]]"));
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering DARK State]]"));
 #endif // DEBUG_SERIAL
         LaserController::turnOff();
         ServoController::stop();
@@ -381,7 +416,7 @@ void loop() { // put your main code here, to run repeatedly:
         statePrevious = stateCurrent;
         //enter code:
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering COOLDOWN State]]"));
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering COOLDOWN State]]"));
 #endif // DEBUG_SERIAL
         LaserController::turnOff(); // it may already have done this itself.
         //servo detach
@@ -411,7 +446,7 @@ void loop() { // put your main code here, to run repeatedly:
         statePrevious = stateCurrent;
         //enter code:
 #ifdef DEBUG_SERIAL
-        Serial.println(F("\r\n[[Entering MANUAL State]]"));
+        if (serialCanWrite) Serial.println(F("\r\n[[Entering MANUAL State]]"));
 #endif // DEBUG_SERIAL
         Interrupt::applySettings(& currentSettings);
         LaserController::turnOff();
@@ -451,7 +486,7 @@ void loop() { // put your main code here, to run repeatedly:
       break;
     default:
 #ifdef DEBUG_SERIAL
-      Serial.println(F("\r\n[[Unknown State requested]]"));
+      if (serialCanWrite) Serial.println(F("\r\n[[Unknown State requested]]"));
 #endif // DEBUG_SERIAL
       stateCurrent = statePrevious; //or INIT? POWERON?
   } // switch STATE
@@ -474,7 +509,7 @@ void loop() { // put your main code here, to run repeatedly:
 
 #ifdef DEBUG_SERIAL
   bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
-  if (outputSerialDebug)
+  if (outputSerialDebug && Serial)
   {
     loopLastSerial = millis();
     Serial.println();
@@ -647,7 +682,7 @@ void checkServoKnobs()
 
 // Version 1.1 attempts to find bimodal peaks and extents:
 void findReflectanceThreshold() {
-  int bin, value, highest = 0, lowest = 1023;
+  int bin, value, highest = 0, lowest = 1023, maxCount=-1;
   int peakOneBin, peakOneBinMax, peakOneBinMin;
   int peakTwoBin, peakTwoBinMax, peakTwoBinMin;
   int troughBin, troughBinMin, troughBinMax;
@@ -660,7 +695,7 @@ void findReflectanceThreshold() {
   for (int i = 0; i < REFLECTANCE_BINCOUNT; bins[i++] = 0);
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE_INIT_READINGS
-  Serial.println(F("\r\nFinding reflectance threshold:"));
+  if (serialCanWrite) Serial.println(F("\r\nFinding reflectance threshold:"));
 #endif
 #endif
   for (int i = 0; i < IR_REFLECTANCE_READINGS; i++)
@@ -674,199 +709,250 @@ void findReflectanceThreshold() {
       lowest = value;
     }
   }
-  if (highest - lowest > (2 * IR_REFLECTANCE_MINIMUM_CONTRAST))
+  if ((highest - lowest) > IR_REFLECTANCE_RANGE_REQUIRED)
   {
     error = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-    Serial.println(F("Reflectance cannot be used: readings too variable without movement (failed sensor?)"));
-    Serial.print(F("Low-High = ")); Serial.print(lowest); Serial.print(F("-")); Serial.println(highest);
+    if (serialCanWrite) {
+      Serial.println(F("Reflectance cannot be used: readings too variable without movement (failed sensor?)"));
+      Serial.print(F("Low-High = ")); Serial.print(lowest); Serial.print(F("-")); Serial.println(highest);
+    }
 #endif
 #endif
   }
-
+  // FIND RANGE FULL STEPS
   if (! error)
   {
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+      if (serialCanWrite) Serial.print(F("Full-step rotation to find reflectance range..."));
+#endif
+#endif
     highest = 0; lowest = 1023;
     StepperController::setStepsToStep(0);
-    StepperController::runHalfstep();
-    for (int i = 0; i < IR_REFLECTANCE_READINGS; i++) {
+    StepperController::runFullstep();
+
+    for (int rotations = 0; rotations < IR_REFLECTANCE_SEEKING_ROTATION_LIMIT && (highest - lowest) <  IR_REFLECTANCE_RANGE_REQUIRED; rotations++) {
+    for (int i = 0; i < STEPPER_FULLSTEPS_PER_ROTATION / 4; i++) {
       value = IrReflectanceSensor::read();
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+#ifdef DEBUG_REFLECTANCE_INIT_READINGS
+      if (serialCanWrite) Serial.println(value);
+#else
+      if (serialCanWrite) Serial.print(hexcode[value / 64]);
+#endif
+#endif
+#endif
       if (value > highest) {
         highest = value;
       }
       if (value < lowest) {
         lowest = value;
       }
+      StepperController::setStepsToStep(4);
+      while (StepperController::getStepsToStep() != 0) { ; }
+    } // steps while fullstepping around
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+    if (serialCanWrite) { Serial.print(F("Reflectance range finding completed rotation "));
+    Serial.println(rotations+1);
+    }
+#endif
+#endif
+    } // rotations
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+if(serialCanWrite){
+#ifndef DEBUG_REFLECTANCE_INIT_READINGS
+      Serial.println();
+#endif
+    Serial.print(F("Reflectance readings range from "));
+    Serial.print(lowest);
+    Serial.print(F(" to "));
+    Serial.print(highest);
+    Serial.println(F("."));
+}
+#endif
+#endif
+    if (highest - lowest < IR_REFLECTANCE_RANGE_REQUIRED)
+    {
+      error = true;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+      if (serialCanWrite) Serial.println(F("Reflectance cannot be used: insufficient contrast!"));
+#endif
+#endif
+    }
+  }// if !error
+
+  // BUILD HISTOGRAM MICROSTEPPING
+  if (! error)
+  {
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+      if (serialCanWrite) Serial.print(F("Microstep rotation to build reflectance histogram..."));
+#endif
+#endif
+    StepperController::setStepsToStep(0);
+    StepperController::runHalfstep();
+    for (int i = 0; i < IR_REFLECTANCE_READINGS; i++) {
+      value = IrReflectanceSensor::read();
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
 #ifdef DEBUG_REFLECTANCE_INIT_READINGS
-      Serial.println(value);
+      if (serialCanWrite) Serial.println(value);
 #else
-      Serial.print(hexcode[value / 64]);
+      if (serialCanWrite) Serial.print(hexcode[value / 64]);
 #endif
 #endif
 #endif
-      bin = value / (1024 / REFLECTANCE_BINCOUNT);
+      bin = (value - lowest) / ((highest-lowest)/ REFLECTANCE_BINCOUNT); // issue #18 - consider only active range?
+//      bin = value / (1024 / REFLECTANCE_BINCOUNT);
+      bin = constrain(bin,0,REFLECTANCE_BINCOUNT-1);
       //smooth the histogram by adding 2 to this bin and 1 to adjacent bins (if they exist)
       bins[bin] += 2;
       if (bin >= 1) bins[bin - 1]++;
       if (bin + 1 < REFLECTANCE_BINCOUNT) bins[bin + 1]++;
       // move to next reading
       StepperController::setStepsToStep(IR_REFLECTANCE_STEPS_PER_READ);
-      while (StepperController::getStepsToStep() != 0) {
-        ;
-      }
+      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
     }
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
+if(serialCanWrite) {
     Serial.println();
-    Serial.print(F("Reflectance readings range from "));
-    Serial.print(lowest);
-    Serial.print(F(" to "));
-    Serial.print(highest);
-    Serial.println(F("."));
     Serial.println(F("Bins:"));
     for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
     {
       Serial.print(i);
-      Serial.print(F(": "));
+      Serial.print(F(" ("));
+      Serial.print(i*((highest-lowest)/ REFLECTANCE_BINCOUNT) + lowest);
+      Serial.print(F("): "));
       Serial.println(bins[i]);
     }
+}
 #endif
 #endif
     // find highest peak
-    highest = -1;
+    maxCount = -1;
     for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
     {
-      if (bins[i] > highest) {
-        highest = bins[i];
+      if (bins[i] > maxCount) {
+        maxCount = bins[i];
         peakOneBin = i;
       }
     }
     // find extent of first peak
+    // consider a bin to be part of a peak if its count is > 1/3 of the peak-side neighbor.
     peakOneBinMax = peakOneBin;
-    while (peakOneBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakOneBinMax + 1] < bins[peakOneBinMax]) peakOneBinMax++;
+    while (peakOneBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakOneBinMax + 1] > (1*bins[peakOneBinMax])/3 ) { peakOneBinMax++; }
     peakOneBinMin = peakOneBin;
-    while (peakOneBinMin > 0 && bins[peakOneBinMin - 1] < bins[peakOneBinMin]) peakOneBinMin--;
+    while (peakOneBinMin > 0 && bins[peakOneBinMin - 1] > (1*bins[peakOneBinMin])/3) { peakOneBinMin--; }
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+if(serialCanWrite){
+    Serial.println();
+    Serial.print(F("Peak One: from bins"));
+    Serial.print(peakOneBinMin);
+    Serial.print(F("-"));
+    Serial.print(peakOneBinMax);
+    Serial.print(F(" with peak @ "));
+    Serial.println(peakOneBin);
+}
+#endif
+#endif
     if (peakOneBinMin == 0 && peakOneBinMax + 1 == REFLECTANCE_BINCOUNT)
     {
       error = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-      Serial.println(F("Reflectance histogram peak covers full range; cannot sense tape."));
+      if (serialCanWrite) Serial.println(F("Reflectance histogram peak covers full range; cannot sense tape."));
 #endif
 #endif
     }
-    if (highest - lowest < IR_REFLECTANCE_MINIMUM_CONTRAST)
-    {
-      error = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      Serial.println(F("Reflectance cannot be used: insufficient contrast!"));
-#endif
-#endif
-    }
+
   }// if !error
   if (!error) {
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    Serial.println();
-    Serial.print(F("Peak One: "));
-    Serial.print(peakOneBinMin);
-    Serial.print(F("-"));
-    Serial.print(peakOneBinMax);
-    Serial.print(F(" @ "));
-    Serial.println(peakOneBin);
-#endif
-#endif
     // find peak in remaining range
-    highest = -1; peakTwoBin = -1;
+    maxCount = -1; 
     for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
     {
       if (i < peakOneBinMin || i > peakOneBinMax) // skip peakOne's range
       {
-        if (bins[i] > highest) {
-          highest = bins[i];
+        if (bins[i] > maxCount) {
+          maxCount = bins[i];
           peakTwoBin = i;
         }
       } // skip peakOne
     } // for i in bins
     // find extent of second peak
+    // consider a bin to be part of a peak if its count is > 1/3 of the peak-side neighbor.
     peakTwoBinMax = peakTwoBin;
-    while (peakTwoBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakTwoBinMax + 1] < bins[peakTwoBinMax]) peakTwoBinMax++;
+    while (peakTwoBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakTwoBinMax + 1] > (1*bins[peakTwoBinMax])/3) peakTwoBinMax++;
     peakTwoBinMin = peakTwoBin;
-    while (peakTwoBinMin > 0 && bins[peakTwoBinMin - 1] < bins[peakTwoBinMin]) peakTwoBinMin--;
+    while (peakTwoBinMin > 0 && bins[peakTwoBinMin - 1] > (1*bins[peakTwoBinMin])/3) peakTwoBinMin--;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+if(serialCanWrite) {
+    Serial.print(F("Peak Two: covers bins "));
+    Serial.print(peakTwoBinMin);
+    Serial.print(F("-"));
+    Serial.print(peakTwoBinMax);
+    Serial.print(F(" with peak at @ "));
+    Serial.println(peakTwoBin);
+}
+#endif
+#endif
     if (bins[peakTwoBin] == 0)
     {
       error = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-      Serial.println(F("No observations outside range of first peak; cannot sense tape."));
+      if (serialCanWrite) Serial.println(F("No observations outside range of first peak; cannot sense tape."));
 #endif
 #endif
     }
   } // !error
   if (!error)
   {
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    Serial.print(F("Peak Two: "));
-    Serial.print(peakTwoBinMin);
-    Serial.print(F("-"));
-    Serial.print(peakTwoBinMax);
-    Serial.print(F(" @ "));
-    Serial.println(peakTwoBin);
-#endif
-#endif
     //find trough between peaks
-    lowest = bins[peakOneBin];
     if (peakOneBin < peakTwoBin)
     {
-      troughBinMin = peakOneBinMax;
-      troughBinMax = peakTwoBinMin;
+      troughBinMin = peakOneBinMax+1;
+      troughBinMax = peakTwoBinMin-1;
     }
     else
     {
-      troughBinMin = peakTwoBinMax;
-      troughBinMax = peakOneBinMin;
+      troughBinMin = peakTwoBinMax+1;
+      troughBinMax = peakOneBinMin-1;
     }
     troughBin = troughBinMin;
-    for (int i = troughBinMin; i <= troughBinMax; i++)
-    {
-      if (bins[i] < lowest)
-      {
-        troughBin = i;
-        lowest = bins[i];
-      }
-    }
-    //find extent of trough
-    troughBinMax = troughBin;
-    while (troughBinMax + 1 < REFLECTANCE_BINCOUNT && bins[troughBinMax + 1] <= bins[troughBinMax]) troughBinMax++;
-    troughBinMin = troughBin;
-    while (troughBinMin > 0 && bins[troughBinMin - 1] <= bins[troughBinMin]) troughBinMin--;
 
-    value = ((troughBinMin + troughBinMax + 1) * (1024 / REFLECTANCE_BINCOUNT)) / 2;
+    //was middle of the trough: value = reflectanceMin + ((troughBinMin + troughBinMax + 1) * (reflectanceRange / REFLECTANCE_BINCOUNT)) / 2;
+    //let's try the end of the first trough bin:
+    value = lowest + ((troughBinMin + 1) * ((highest-lowest) / REFLECTANCE_BINCOUNT));
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-    Serial.print(F("Trough: "));
+if(serialCanWrite) {
+    Serial.print(F("Trough: bins "));
     Serial.print(troughBinMin);
     Serial.print(F("-"));
     Serial.print(troughBinMax);
-    Serial.print(F(" @ "));
-    Serial.println(troughBin);
     Serial.print(F("Reflectance threshold = "));
     Serial.println(value);
+}
 #endif
 #endif
     IrReflectanceSensor::setPresentThreshold(value);
   }//!error
-  else
-  {
+  
+  if(error) {
     IrReflectanceSensor::setDisabled(true);
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-    Serial.println(F("Laser will be enabled full circle!"));
+    if (serialCanWrite) Serial.println(F("Laser will be enabled full circle!"));
 #endif
 #endif
   }

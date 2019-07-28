@@ -135,12 +135,16 @@
 #define IR_REFLECTANCE_MID_READ_LIMIT 10
 #define IR_REFLECTANCE_DEFAULT_PRESENT 550
 //no longer used with better calibration algorithm: #define IR_REFLECTANCE_DEFAULT_ABSENT 400
-#define IR_REFLECTANCE_MINIMUM_CONTRAST 16
 //when seeking for the tape, the system will make
 //at most this many full rotations; if
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
-#define SEEKING_ROTATION_LIMIT 2
+#define IR_REFLECTANCE_SEEKING_ROTATION_LIMIT 2
+#define IR_REFLECTANCE_SEEKING_STEPS_PER_READ 4
+// minimum difference in raw readings required to use reflectance:
+#define IR_REFLECTANCE_RANGE_REQUIRED 100
+// how often to recalibrate the refelctance readings (ms: 3600000 = 1h production; 60000 = 1min testing)
+#define IR_REFLECTANCE_RECALIBRATE_MS 60000
 // to use reflective tape on a non-reflective (black) bucket (e.g., 2018 kits),
 // invert the logic of the isPresent, isAbsent tests (leave actual values alone):
 #define IR_REFLECTANCE_INVERT
@@ -249,8 +253,8 @@
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
-//#define DEBUG_REFLECTANCE
-//#define DEBUG_REFLECTANCE_INIT_READINGS
+#define DEBUG_REFLECTANCE
+#define DEBUG_REFLECTANCE_INIT_READINGS
 #define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
 #define DEBUG_SETTINGSOBSERVER
