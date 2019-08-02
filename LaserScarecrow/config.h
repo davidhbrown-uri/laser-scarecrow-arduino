@@ -15,6 +15,8 @@
  
   2.1.1 beta - issue #32 attempt to find minimum useful span and set random steps accordingly
   2.1.0.alpha - issue #18 - rework light sensor threshold setting; recheck periodically -- fix is not just software but also requires hardware change from 10k to 4.7k resistor in tape sensor.
+
+  2.0.3 - address issue #34 - bugfixes to setting of minimum angle (oversights in earlier code)
   
   2.0.1 - fix issue #28 - servo motion stops when angle adjusted via knob; added manual servo hold timeout
   2.0.0a - disabled LASER_TOGGLE_WITH_INTERRUPT
@@ -259,9 +261,9 @@
 //#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
-#define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
-#define DEBUG_SETTINGSOBSERVER
+//#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS

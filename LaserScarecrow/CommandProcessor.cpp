@@ -215,7 +215,10 @@ void CommandProcessor::process()
             if (command->parameterCount == 1 && command->parameter[0] < 1024)
             {
               /* @todo get servo limits from configuration */
-              settings->servo_min = constrain(command->parameter[0], SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
+              // update v2.1... use map instead of constrain; also attempt to reset range (avoid inversion)
+              int currentRange = map(settings->servo_max, settings->servo_min, SERVO_PULSE_USABLE_MAX, 0, 1023);
+              settings->servo_min = map(command->parameter[0], 0, 1023, SERVO_PULSE_USABLE_MIN, SERVO_PULSE_USABLE_MAX);
+              settings->servo_max = map(currentRange, 0, 1023, settings->servo_min, SERVO_PULSE_USABLE_MAX);
               processOK();
             } else
             {
