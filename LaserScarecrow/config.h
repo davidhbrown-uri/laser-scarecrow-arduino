@@ -7,11 +7,14 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.0.1 - Version 2 Release")
+#define SOFTWARE_VERSION F("Version 2.0.3 - Version 2 Release")
 
 /*******************
    VERSION HISTORY
  *******************
+
+  2.0.3 - address issue #34 - bugfixes to setting of minimum angle (oversights in earlier code)
+  
   2.0.1 - fix issue #28 - servo motion stops when angle adjusted via knob; added manual servo hold timeout
   2.0.0a - disabled LASER_TOGGLE_WITH_INTERRUPT
   2.0.0 - Tweaked a few minor things
@@ -246,14 +249,14 @@
 #define DEBUG_SERIAL_DATARATE 57600
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
 #define DEBUG_SERIAL_COUNTDOWN_SECONDS 4
-#define DEBUG_SERVO
+//#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
-#define DEBUG_REFLECTANCE
+//#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_INIT_READINGS
-#define DEBUG_SETTINGS
-#define DEBUG_SETTINGS_VERBOSE
-#define DEBUG_SETTINGSOBSERVER
+//#define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS_VERBOSE
+//#define DEBUG_SETTINGSOBSERVER
 
 //#define DEBUG_STEPPER
 //#define DEBUG_STEPPER_STEPS
@@ -261,4 +264,4 @@
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY
 //#define DEBUG_RTC
-#define DEBUG_BLUETOOTH
+//#define DEBUG_BLUETOOTH
