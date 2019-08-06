@@ -174,8 +174,10 @@
 #define SETTINGSOBSERVER_SAVE_AFTER_MS 15000
 //exit servo manual hold after this time elapsed; probably convenient to have same as save time to indicate when the settings are saved
 #define SERVO_MANUAL_HOLD_MS 15000
-//laser will stay on this long after movement in manual mode
-#define STATE_MANUAL_LASER_OFF_DELAY_MS 15000
+//laser will pulse at apx this rate in manual mode, pattern b10100000 if laser is blocked by reflectance or b01011111 if not.
+#define STATE_MANUAL_LASER_PULSE_MS 150
+// pattern will be right-shifted every pulse and reset when 0, so its loop length is its highest 1-bit.
+#define STATE_MANUAL_LASER_PULSE_PATTERN 160
 
 /*************
  * Software configuration
