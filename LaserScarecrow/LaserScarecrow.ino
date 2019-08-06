@@ -692,7 +692,7 @@ void findReflectanceThreshold() {
   int bin, value, highest = 0, lowest = 1023, maxCount=-1;
   int peakOneBin, peakOneBinMax, peakOneBinMin;
   int peakTwoBin, peakTwoBinMax, peakTwoBinMin;
-  int troughBin, troughBinMin, troughBinMax;
+  int troughBinMin, troughBinMax;
 #ifdef DEBUG_REFLECTANCE
   const char hexcode[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 #endif
@@ -733,7 +733,7 @@ void findReflectanceThreshold() {
   {
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.print(F("Full-step rotation to find reflectance range..."));
+      if (serialCanWrite) Serial.println(F("Full-step rotation to find reflectance range..."));
 #endif
 #endif
     highest = 0; lowest = 1023;
@@ -799,7 +799,7 @@ if(serialCanWrite){
   {
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.print(F("Microstep rotation to build reflectance histogram..."));
+      if (serialCanWrite) Serial.println(F("Microstep rotation to build reflectance histogram..."));
 #endif
 #endif
     StepperController::setStepsToStep(0);
@@ -935,24 +935,39 @@ if(serialCanWrite) {
       troughBinMin = peakTwoBinMax+1;
       troughBinMax = peakOneBinMin-1;
     }
-    troughBin = troughBinMin;
-
-    //was middle of the trough: value = reflectanceMin + ((troughBinMin + troughBinMax + 1) * (reflectanceRange / REFLECTANCE_BINCOUNT)) / 2;
-    //let's try the end of the first trough bin:
-    value = lowest + ((troughBinMin + 1) * ((highest-lowest) / REFLECTANCE_BINCOUNT));
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
 if(serialCanWrite) {
     Serial.print(F("Trough: bins "));
     Serial.print(troughBinMin);
     Serial.print(F("-"));
-    Serial.print(troughBinMax);
+    Serial.println(troughBinMax);
+}
+#endif
+#endif
+    if (troughBinMax <= troughBinMin) {
+      error=true;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+if(serialCanWrite) {
+    Serial.print(F("Peaks overlap; cannot reliably separate high from low reflectance."));
+}
+#endif
+#endif
+    } else { // can calculate threshold between peaks
+    //was middle of the trough: value = reflectanceMin + ((troughBinMin + troughBinMax + 1) * (reflectanceRange / REFLECTANCE_BINCOUNT)) / 2;
+    //let's try 20% (1/5) into the trough:
+    value = lowest + troughBinMin * ((highest-lowest) / REFLECTANCE_BINCOUNT) + (((troughBinMax) * ((highest-lowest) / REFLECTANCE_BINCOUNT))/5);
+    IrReflectanceSensor::setPresentThreshold(value);
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_REFLECTANCE
+if(serialCanWrite) {
     Serial.print(F("Reflectance threshold = "));
     Serial.println(value);
 }
 #endif
 #endif
-    IrReflectanceSensor::setPresentThreshold(value);
+    }//else peaks do not overlap
   }//!error
   IrReflectanceSensor::setDisabled(error);
   if (!error) {
@@ -1017,7 +1032,7 @@ int findShortestUsableSpan() {
     if (stepsStepped > stepsInCircle) return -2; //could not find end of tape
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.print(F("Found end of tape")); }
+    if(serialCanWrite) { Serial.println(F("Found end of tape")); }
 #endif
 #endif
    bool inUsableSpan=true;
@@ -1037,7 +1052,7 @@ int findShortestUsableSpan() {
     if(serialCanWrite) { Serial.print(F("Found end of span with length = ")); Serial.println(spanLength); }
 #endif
 #endif
-      if(spanLength>2*MATCH_STEPS) { // don't count very short spans toward shortest
+      if(spanLength>2*MATCH_STEPS) { // span counts toward shortest unless very short
         shortestSpan=min(shortestSpan,spanLength);
       }
       inUsableSpan=false;
