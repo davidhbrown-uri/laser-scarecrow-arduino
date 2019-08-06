@@ -40,8 +40,8 @@
 */
 byte stateCurrent, statePrevious;
 bool stateManual;
-unsigned long stateManualLaserOffCountdownMillis;
-bool stateManualLaserOffCountdownStarted = false;
+unsigned long manualLaserPulseMillis;
+byte manualLaserPulseMask;
 
 unsigned long loopLedLastChangeMillis = 0L;
 unsigned long loopProcessLastMillis = 0L;
@@ -418,28 +418,28 @@ void loop() { // put your main code here, to run repeatedly:
         StepperController::runHalfstep();
         StepperController::setStepsToStep(0);
         ServoController::runManually();
+        manualLaserPulseMillis=millis();
       } // enter code
-      //manual behaviors
-      if (StepperController::getStepsToStep() == 0 // not rotating
-          && ServoController::getPulse() == ServoController::getPulseTarget() // not changing angle
-         )
-      { // turn laser off after delay
-        if (!stateManualLaserOffCountdownStarted) {
-          stateManualLaserOffCountdownMillis = millis();
-          stateManualLaserOffCountdownStarted = true;
-        } else {
-          if (millis() - stateManualLaserOffCountdownMillis >= STATE_MANUAL_LASER_OFF_DELAY_MS)
-          { 
+      // manual behaviors mostly done by command processor
+      // here, we only need to pulse the laser depending on whether tape is sensed
+      if(millis()-manualLaserPulseMillis > STATE_MANUAL_LASER_PULSE_MS) {
+        manualLaserPulseMask = manualLaserPulseMask==0 ? STATE_MANUAL_LASER_PULSE_PATTERN : manualLaserPulseMask >> 1;
+        manualLaserPulseMillis = millis();
+        if(IrReflectanceSensor::isPresent()) {
+          if(manualLaserPulseMask & B00000001 == B00000001) {
+            LaserController::turnOn();
+          } else {
             LaserController::turnOff();
-            stateManualLaserOffCountdownStarted = false;
           }
-        }
-      }
-      else
-      { // there is motion, so turn laser on. Cancel any countdown.
-        LaserController::turnOn();
-        stateManualLaserOffCountdownStarted = false;
-      }
+        } else { // no reflectance
+          if(manualLaserPulseMask & B00000001 == B00000001) {
+            LaserController::turnOff();
+          } else {
+            LaserController::turnOn();
+          }          
+        } // else no reflectance
+      } // manual mode laser pulse
+      
       if (!stateManual) {
         stateCurrent = STATE_ACTIVE;
         // don't want to go to POWERON or INIT; unstored settings would be overwritten.
