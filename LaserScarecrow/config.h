@@ -7,12 +7,14 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.1.1.beta - Version 2.1 beta")
+#define SOFTWARE_VERSION F("Version 2.3 - August 6, 2019 release")
 
 /*******************
    VERSION HISTORY
  *******************
- 
+
+  2.3.0 - better support for Bluetooth control and tape sensor
+  
   2.1.1 beta - issue #32 attempt to find minimum useful span and set random steps accordingly
   2.1.0.alpha - issue #18 - rework light sensor threshold setting; recheck periodically -- fix is not just software but also requires hardware change from 10k to 4.7k resistor in tape sensor.
 
