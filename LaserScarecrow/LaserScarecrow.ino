@@ -320,6 +320,7 @@ void loop() { // put your main code here, to run repeatedly:
       //update:
       // check for transition events (later checks have priority)
       if (millis()-stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS) {
+        stateInitReflectanceMillis=millis();
         stateCurrent = STATE_INIT_REFLECTANCE;
       }
       if (IrReflectanceSensor::isPresent()) stateCurrent = STATE_SEEKING;
