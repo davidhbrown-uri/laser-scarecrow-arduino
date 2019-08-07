@@ -325,13 +325,15 @@ void loop() { // put your main code here, to run repeatedly:
       }
       if (IrReflectanceSensor::isPresent()) stateCurrent = STATE_SEEKING;
       if (LaserController::isCoolingDown()) stateCurrent = STATE_COOLDOWN;
-      if (rtc_is_running && currentSettings.rtc_control)
+
+      // do not go dark if BT is connected, issue #37
+      if (!bt_connected && rtc_is_running && currentSettings.rtc_control)
       {
         if (!rtcIsWakePeriod()) stateCurrent = STATE_DARK;
       }
       else
       {
-        if (AmbientLightSensor::isDark()) stateCurrent = STATE_DARK;
+        if (!bt_connected && AmbientLightSensor::isDark()) stateCurrent = STATE_DARK;
       }
       // do our things:
       if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(STEPPER_RANDOMSTEPS_MIN, STEPPER_RANDOMSTEPS_MAX);
