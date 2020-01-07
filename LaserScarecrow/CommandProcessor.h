@@ -12,7 +12,7 @@
    responsibilities.
 
    Created by David H. Brown, February 25, 2018
-   License TBD
+   License TBD, but includes GPL components, so there's that...
    Part of the URI Laser Scarecrow project
 */
 #ifndef CommandProcessor_h
@@ -24,11 +24,7 @@
 #include "IrReflectanceSensor.h"
 #include "StepperController.h"
 #include "ServoController.h"
-#include <uRTCLib.h>
-// make a RTC class of my own?
-extern uRTCLib rtc;
-extern bool rtc_is_running;
-// same for the state?
+
 extern byte stateCurrent, statePrevious;
 extern bool stateManual;
 
@@ -52,11 +48,6 @@ extern bool stateManual;
 #define CPCODE_RtcControl 201
 #define CPCODE_LightSensorRead 210
 #define CPCODE_LightThrehold 221
-#define CPCODE_RtcYmd 251
-#define CPCODE_RtcHms 252
-#define CPCODE_RtcRunning 259
-#define CPCODE_RtcWake 261
-#define CPCODE_RtcSleep 262
 
 
 enum CPSTATUS {

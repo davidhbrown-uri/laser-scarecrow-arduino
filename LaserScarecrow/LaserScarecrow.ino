@@ -19,9 +19,6 @@
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
 #include <Wire.h>
-#include <uRTCLib.h>
-
-
 
 // definitions for finite state machine
 // STATE_CONTINUE can be used to indicate that the current state should be continued
@@ -59,10 +56,6 @@ unsigned long loopLastAimStatus = 0L;
 #endif
 #endif
 
-unsigned long rtc_last_refresh_millis = 0UL;
-bool rtc_is_running = false;
-uint8_t rtc_last_second;
-
 bool bt_connected = false;
 /*
       In classes that need to access the current settings,
@@ -73,7 +66,6 @@ bool bt_connected = false;
 
 */
 Settings currentSettings;
-uRTCLib rtc(RTC_WIRE_RTC_ADDRESS, RTC_WIRE_EE_ADDRESS);
 Command uCommand, btCommand;
 CommandProcessor uProcessor, btProcessor;
 
@@ -252,21 +244,7 @@ void loop() { // put your main code here, to run repeatedly:
         IrReflectanceSensor::init();
         AmbientLightSensor::init();
         Interrupt::init();
-  // check if clock is running
-  rtc.refresh();
-  rtc_last_second = rtc.second();
-  delay(1200); 
-  rtc.refresh();
-  rtc_is_running = (rtc_last_second != rtc.second());
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_RTC
-  if (serialCanWrite) {
-    Serial.print(F("RTC at startup is "));
-    Serial.println(rtc_is_running ? F("running") : F("STOPPED"));
-  }
-#endif
-#endif      
-}// finish enter code
+}// finish /enter code
       //update:
       stateCurrent = STATE_INIT_REFLECTANCE;
       if (stateCurrent != statePrevious) {
@@ -327,13 +305,8 @@ void loop() { // put your main code here, to run repeatedly:
       if (LaserController::isCoolingDown()) stateCurrent = STATE_COOLDOWN;
 
       // do not go dark if BT is connected, issue #37
-      if (!bt_connected && rtc_is_running && currentSettings.rtc_control)
-      {
-        if (!rtcIsWakePeriod()) stateCurrent = STATE_DARK;
-      }
-      else
-      {
-        if (!bt_connected && AmbientLightSensor::isDark()) stateCurrent = STATE_DARK;
+      if (!bt_connected && AmbientLightSensor::isDark()) {
+        stateCurrent = STATE_DARK;
       }
       // do our things:
       if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(STEPPER_RANDOMSTEPS_MIN, STEPPER_RANDOMSTEPS_MAX);
@@ -403,13 +376,8 @@ void loop() { // put your main code here, to run repeatedly:
         Interrupt::setFrequency(1);
       }
       //update:
-      if (rtc_is_running && currentSettings.rtc_control)
-      {
-        if (rtcIsWakePeriod()) stateCurrent = STATE_SEEKING;
-      }
-      else
-      {
-        if (AmbientLightSensor::isLight()) stateCurrent = STATE_SEEKING;
+      if (AmbientLightSensor::isLight()) {
+        stateCurrent = STATE_SEEKING;
       }
       if (stateManual) {
         stateCurrent = STATE_MANUAL;
@@ -506,13 +474,6 @@ void loop() { // put your main code here, to run repeatedly:
   // timing-imprecise tasks:
   LaserController::update();
   AmbientLightSensor::update();
-  if (millis() - rtc_last_refresh_millis > RTC_REFRESH_MILLIS)
-  {
-    rtc.refresh();
-    rtc_last_refresh_millis = millis();
-    rtc_is_running = ( rtc.second() != rtc_last_second);
-    rtc_last_second = rtc.second();
-  }
   digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
 
   ////////// DEBUG OUTPUT:
@@ -564,35 +525,7 @@ void loop() { // put your main code here, to run repeatedly:
     Serial.print(F("; KNOB3="));
     Serial.print(analogRead(KNOB3_PIN));
 #endif
-#ifdef DEBUG_RTC
-    rtc.refresh();
 
-//    Serial.print(F("\r\nRTC DateTime: "));
-//    Serial.print(rtc.year());
-//    Serial.print('/');
-//    Serial.print(rtc.month());
-//    Serial.print('/');
-//    Serial.print(rtc.day());
-
-//    Serial.print(' ');
-// really we care only about the time:
-    Serial.print(F("\r\nRTC time: "));
-    Serial.print(rtc.hour());
-    Serial.print(':');
-    Serial.print(rtc.minute());
-    Serial.print(':');
-    Serial.print(rtc.second());
-    Serial.print(F("\r\n  wake/sleep cycle mode = "));
-    Serial.print(currentSettings.rtc_control ? F("RTC") : F("sensor"));
-    Serial.print(F("; if RTC control, wake at "));
-    Serial.print(currentSettings.rtc_wake / 60);
-    Serial.print(':');
-    Serial.print(currentSettings.rtc_wake % 60);
-    Serial.print(F(" and sleep at "));
-    Serial.print(currentSettings.rtc_sleep / 60);
-    Serial.print(':');
-    Serial.println(currentSettings.rtc_sleep % 60);
-#endif
 #ifdef DEBUG_BLUETOOTH
     Serial.print(F("\r\nBluetooth state: "));
     Serial.println(digitalRead(BT_PIN_STATE));
@@ -641,22 +574,6 @@ ISR(TIMER3_COMPA_vect)
    Helper functions
    Put things here that require access to multuple modules
 */
-
-/** considers cycle mode and RTC
-    True if RTC settings indicate it's a wake period
-
-*/
-bool rtcIsWakePeriod()
-{
-  int timeInt = rtc.hour();
-  if (timeInt < 0 || timeInt > 23) // invalid values indicate a problem with the RTC, so let's be awake
-  {
-    return true;
-  }
-  timeInt *= 60;
-  timeInt += rtc.minute();
-  return (timeInt > currentSettings.rtc_wake) != (timeInt > currentSettings.rtc_sleep) != (currentSettings.rtc_wake > currentSettings.rtc_sleep);
-}
 
 void checkSpeedKnob()
 {

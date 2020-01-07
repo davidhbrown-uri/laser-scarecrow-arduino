@@ -13,6 +13,8 @@
    VERSION HISTORY
  *******************
 
+  2.3.1 - remove RTC support. Never going to be used vs. ambient light; don't need the battery-backed RAM, either (using EEPROM)
+
   2.3.0 - better support for Bluetooth control and tape sensor. 
   
   2.1.1 beta - issue #32 attempt to find minimum useful span and set random steps accordingly
@@ -250,10 +252,8 @@
 #define LED1_INVERT true
 #define LED2_PIN LED_BUILTIN_TX
 #define LED2_INVERT true
-
-#define RTC_WIRE_RTC_ADDRESS 0x68
-#define RTC_WIRE_EE_ADDRESS 0x57
-/***************************
+ 
+ /***************************
  * DEBUG Flags
  */
 #define DEBUG_SERIAL
@@ -274,5 +274,4 @@
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY
-//#define DEBUG_RTC
 //#define DEBUG_BLUETOOTH

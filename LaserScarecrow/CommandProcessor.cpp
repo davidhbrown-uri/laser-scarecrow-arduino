@@ -91,36 +91,6 @@ void CommandProcessor::process()
             stream->println(IrReflectanceSensor::read());
             processOK();
             break;
-          case CPCODE_RtcYmd:
-            stream->print(rtc.year()); stream->print(' ');
-            stream->print(rtc.month()); stream->print(' ');
-            stream->println(rtc.day());
-            processOK();
-            break;
-          case CPCODE_RtcHms:
-            stream->print(rtc.hour()); stream->print(' ');
-            stream->print(rtc.minute()); stream->print(' ');
-            stream->println(rtc.second());
-            processOK();
-            break;
-          case CPCODE_RtcRunning:
-            stream->println(rtc_is_running ? 1 : 0);
-            processOK();
-            break;
-          case CPCODE_RtcWake:
-            stream->print(getHoursFromTimeWord(settings->rtc_wake)); stream->print(' ');
-            stream->println(getMinutesFromTimeWord(settings->rtc_wake));
-            processOK();
-            break;
-          case CPCODE_RtcSleep:
-            stream->print(getHoursFromTimeWord(settings->rtc_sleep)); stream->print(' ');
-            stream->println(getMinutesFromTimeWord(settings->rtc_sleep));
-            processOK();
-            break;
-          case CPCODE_RtcControl:
-            stream->println(settings->rtc_control);
-            processOK();
-            break;
           case CPCODE_LightSensorRead:
             stream->println(AmbientLightSensor::read());
             processOK();
@@ -167,16 +137,6 @@ void CommandProcessor::process()
               processError(CPSTATUS_InvalidParameter);
             }
             break;
-          case CPCODE_RtcControl: // rtc_control
-            if (command->parameterCount == 1 && command->parameter[0] < 2)
-            {
-              settings->rtc_control = command->parameter[0];
-              processOK();
-            } else
-            {
-              processError(CPSTATUS_InvalidParameter);
-            }
-            break; // case 201
           case CPCODE_LightThrehold:
             if (command->parameterCount == 1 && command->parameter[0] < 1024)
             {
@@ -247,63 +207,7 @@ void CommandProcessor::process()
               processError(CPSTATUS_InvalidParameter);
             }
             break;
-          case CPCODE_RtcYmd:
-            if (command->parameterCount > 2 && command->parameterCount < 4) {
-              int year = command->parameter[0] % 100;
-              int month = command->parameter[1] % 12;
-              int day = command->parameter[2] % 31;
-              stream->print(year); stream->print(' ');
-              stream->print(month); stream->print(' ');
-              stream->println(day);
-              rtc.set(rtc.second(), rtc.minute(), rtc.hour(), rtc.dayOfWeek(),
-                      day, month, year);
-              rtc.refresh();
-              rtc_is_running = true;//at least, it had better be
-              processOK();
-            } else
-            {
-              processError(CPSTATUS_InvalidParameter);
-            }
-            break;
-          case CPCODE_RtcHms:
-            // note that both the 1307 and 3231 use 24-hour mode unless
-            // bit 6 is set high when setting the hours. So, unless you
-            // try to make 12-hour mode happen, it won't, so don't worry
-            // about it. Similarly, the oscillator will run and time will
-            // be kept unless bit 7 of the seconds register is raised.
-            if (command->parameterCount > 1 && command->parameterCount < 4) {
-              int hours = command->parameter[0] % 24;
-              int minutes = command->parameter[1] % 60;
-              int seconds = (command->parameterCount == 3) ? command->parameter[2] % 60 : 0;
-              stream->print(hours); stream->print(' ');
-              stream->print(minutes); stream->print(' ');
-              stream->println(seconds);
-              rtc.set(seconds, minutes, hours, rtc.dayOfWeek(), rtc.day(), rtc.month(), rtc.year());
-              rtc.refresh();
-              rtc_is_running = true;//at least, it had better be
-              processOK();
-            } else
-            {
-              processError(CPSTATUS_InvalidParameter);
-            }
-            break;
-          case CPCODE_RtcWake:
-          case CPCODE_RtcSleep:
-            if (command->parameterCount == 2 &&
-                command->parameter[0] >= 0 && command->parameter[0] < 24 &&
-                command->parameter[1] >= 0 && command->parameter[0] < 60) {
-              if (command->code == CPCODE_RtcWake) {
-                settings->rtc_wake = getTimeWord(command->parameter[0], command->parameter[1]);
-              } else {
-                settings->rtc_sleep = getTimeWord(command->parameter[0], command->parameter[1]);
-              }
-              processOK();
-            } // if parameters valid
-            else
-            {
-              processError(CPSTATUS_InvalidParameter);
-            }
-            break;
+
           default:
             processError(CPSTATUS_InvalidCode);
         } // switch code
@@ -361,16 +265,4 @@ void CommandProcessor::finishProcess()
   }
   command->init();
   status = CPSTATUS_Ready;
-}
-
-byte CommandProcessor::getHoursFromTimeWord(word time) {
-  word hours = time / 60;
-  return hours > 255 ? 255 : hours;
-}
-byte CommandProcessor::getMinutesFromTimeWord(word time) {
-  return time % 60;
-}
-word CommandProcessor::getTimeWord(byte hours, byte minutes)
-{
-  return (word) (60L * (long)hours + (long)minutes);
 }
