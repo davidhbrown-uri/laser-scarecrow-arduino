@@ -5,6 +5,7 @@
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
 */
+#include <Arduino.h>
 #include "config.h"
 #include "Settings.h"
 #include "Interrupt.h"
@@ -13,6 +14,7 @@
 #include "LaserController.h"
 #include "AmbientLightSensor.h"
 #include "IrReflectanceSensor.h"
+#include "IrThreshold.h"
 #include "LaserController.h"
 #include "AnalogInput.h"
 #include "Command.h"
@@ -32,6 +34,11 @@
 #define STATE_COOLDOWN 60
 #define STATE_MANUAL 99
 
+// forward definition of functions found below
+void checkSpeedKnob();
+void checkServoKnobs();
+void findReflectanceThreshold();
+int findShortestUsableSpan();
 
 /*****************
    GLOBALS
@@ -71,6 +78,11 @@ CommandProcessor uProcessor, btProcessor;
 
 AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
 
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_LOOP_TIME
+unsigned long loopCount=0L;
+#endif
+#endif
 /*************************************
    SETUP
 */
@@ -81,6 +93,11 @@ void setup() {
   /*************************
      INITIALIZE I/O
   */
+
+  int unused_pins[UNUSED_PIN_COUNT] = UNUSED_PINS ;
+  for(int i = 0; i < UNUSED_PIN_COUNT; i++) {
+    pinMode(unused_pins[i], INPUT_PULLUP);
+  } 
 
   // Knobs
   knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
@@ -98,6 +115,7 @@ void setup() {
 
   pinMode(BT_PIN_STATE, INPUT);
 
+
   /*********************
      Settings, Configuration, and command processors
   */
@@ -113,6 +131,12 @@ void setup() {
   //future:  uProcessor.setRTC(&rtc);
   uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
 #endif
+#ifndef COMMAND_PROCESSOR_ENABLE_USB
+#ifdef DEBUG_SERIAL
+Serial.begin(COMMAND_PROCESSOR_DATARATE_USB);
+#endif
+#endif
+
 #ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
   pinMode(BT_PIN_STATE, INPUT);// Should be high when connected, low when not
   pinMode(BT_PIN_RXD, INPUT); // is this going to be handled by Serial1.begin?
@@ -198,8 +222,8 @@ void loop() { // put your main code here, to run repeatedly:
       currentSettings.init();
       StepperController::init();
       StepperController::stop();
+// Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
-      Serial.begin(DEBUG_SERIAL_DATARATE);
       if (serialCanWrite) Serial.println();
       for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--) {
         serialCanWrite = Serial && Serial.availableForWrite() > 16;
@@ -270,7 +294,7 @@ void loop() { // put your main code here, to run repeatedly:
         //laser is on here
       }//end enter code
       // do/ :
-      findReflectanceThreshold();
+      IrThreshold::setReflectanceThreshold();
       stateCurrent = STATE_DARK;
       if (stateCurrent != statePrevious) {
         //exit code:
@@ -291,9 +315,10 @@ void loop() { // put your main code here, to run repeatedly:
         LaserController::turnOn();
         ServoController::run();
         StepperController::runHalfstep();
-        StepperController::setStepsToStepRandom(
-          currentSettings.stepper_randomsteps_min,
-          currentSettings.stepper_randomsteps_max);
+// don't do this on entry, as it's might have been set by STATE_SEEKING; only do it if stepsToStep==0, below
+//        StepperController::setStepsToStepRandom(
+//          currentSettings.stepper_randomsteps_min,
+//          currentSettings.stepper_randomsteps_max);
       }
       //update:
       // check for transition events (later checks have priority)
@@ -309,7 +334,7 @@ void loop() { // put your main code here, to run repeatedly:
         stateCurrent = STATE_DARK;
       }
       // do our things:
-      if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(STEPPER_RANDOMSTEPS_MIN, STEPPER_RANDOMSTEPS_MAX);
+      if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
       if (stateManual) {
         stateCurrent = STATE_MANUAL;
       }
@@ -326,8 +351,10 @@ void loop() { // put your main code here, to run repeatedly:
 #ifdef DEBUG_SERIAL
         if (serialCanWrite) Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
+        StepperController::setStepsToStep(1); // trying to avoid backing into tape 2020-08-10
         Interrupt::applySettings(& currentSettings);
         LaserController::turnOff();
+        StepperController::setStepsToStep(0);
         ServoController::stop();
         StepperController::runFullstep();
         StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
@@ -340,7 +367,8 @@ void loop() { // put your main code here, to run repeatedly:
         stateCurrent = STATE_ACTIVE;
         // force some forward movement to avoid lots of chattering at trailing edge of tape
         // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
-        StepperController::setStepsToStep(random(currentSettings.stepper_randomsteps_max,currentSettings.stepper_randomsteps_max*1.5));
+        // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
+        StepperController::setStepsToStep(random(currentSettings.stepper_randomsteps_max/2,currentSettings.stepper_randomsteps_max));
       }
       //do our things:
       if (StepperController::getStepsToStep() == 0)
@@ -439,13 +467,13 @@ void loop() { // put your main code here, to run repeatedly:
         manualLaserPulseMask = manualLaserPulseMask==0 ? STATE_MANUAL_LASER_PULSE_PATTERN : manualLaserPulseMask >> 1;
         manualLaserPulseMillis = millis();
         if(IrReflectanceSensor::isPresent()) {
-          if(manualLaserPulseMask & B00000001 == B00000001) {
+          if((manualLaserPulseMask & B00000001) == B00000001) {
             LaserController::turnOn();
           } else {
             LaserController::turnOff();
           }
         } else { // no reflectance
-          if(manualLaserPulseMask & B00000001 == B00000001) {
+          if((manualLaserPulseMask & B00000001) == B00000001) {
             LaserController::turnOff();
           } else {
             LaserController::turnOn();
@@ -479,12 +507,25 @@ void loop() { // put your main code here, to run repeatedly:
   ////////// DEBUG OUTPUT:
 
 #ifdef DEBUG_SERIAL
-  bool outputSerialDebug = (millis() - loopLastSerial > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
+#ifdef DEBUG_LOOP_TIME
+loopCount++;
+#endif
+  long loopsTotalDuration = millis() - loopLastSerial;
+  loopLastSerial = millis();
+  bool outputSerialDebug = (loopsTotalDuration > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug && Serial)
   {
-    loopLastSerial = millis();
     Serial.println();
-    Serial.print(SOFTWARE_VERSION);
+#ifdef DEBUG_LOOP_TIME
+    Serial.print(F("Average loop duration (ms): "));
+    Serial.print(loopsTotalDuration / loopCount);
+    Serial.print(F("  ("));
+    Serial.print(loopsTotalDuration);
+    Serial.print(F(" / "));
+    Serial.println(loopCount);
+    loopCount=0L;
+#endif
+    Serial.println(SOFTWARE_VERSION);
 #ifdef DEBUG_SETTINGS_VERBOSE
     currentSettings.printToStream(&Serial);
 #endif
@@ -606,405 +647,3 @@ void checkServoKnobs()
     //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
   }
 }
-
-// Version 1.1 attempts to find bimodal peaks and extents:
-void findReflectanceThreshold() {
-  int bin, value, highest = 0, lowest = 1023, maxCount=-1;
-  int peakOneBin, peakOneBinMax, peakOneBinMin;
-  int peakTwoBin, peakTwoBinMax, peakTwoBinMin;
-  int troughBinMin, troughBinMax;
-#ifdef DEBUG_REFLECTANCE
-  const char hexcode[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-#endif
-  bool error = false;
-#define REFLECTANCE_BINCOUNT 32
-  int bins[REFLECTANCE_BINCOUNT];
-  for (int i = 0; i < REFLECTANCE_BINCOUNT; bins[i++] = 0);
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE_INIT_READINGS
-  if (serialCanWrite) Serial.println(F("\r\nFinding reflectance threshold:"));
-#endif
-#endif
-  for (int i = 0; i < IR_REFLECTANCE_READINGS; i++)
-  {
-    delay(1);
-    value = IrReflectanceSensor::read();;
-    if (value > highest) {
-      highest = value;
-    }
-    if (value < lowest) {
-      lowest = value;
-    }
-  }
-  if ((highest - lowest) > IR_REFLECTANCE_RANGE_REQUIRED)
-  {
-    error = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if (serialCanWrite) {
-      Serial.println(F("Reflectance cannot be used: readings too variable without movement (failed sensor?)"));
-      Serial.print(F("Low-High = ")); Serial.print(lowest); Serial.print(F("-")); Serial.println(highest);
-    }
-#endif
-#endif
-  }
-  // FIND RANGE FULL STEPS
-  if (! error)
-  {
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.println(F("Full-step rotation to find reflectance range..."));
-#endif
-#endif
-    highest = 0; lowest = 1023;
-    StepperController::setStepsToStep(0);
-    StepperController::runFullstep();
-
-    for (int rotations = 0; rotations < IR_REFLECTANCE_SEEKING_ROTATION_LIMIT && (highest - lowest) <  IR_REFLECTANCE_RANGE_REQUIRED; rotations++) {
-    for (int i = 0; i < STEPPER_FULLSTEPS_PER_ROTATION / 4; i++) {
-      value = IrReflectanceSensor::read();
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-#ifdef DEBUG_REFLECTANCE_INIT_READINGS
-      if (serialCanWrite) Serial.println(value);
-#else
-      if (serialCanWrite) Serial.print(hexcode[value / 64]);
-#endif
-#endif
-#endif
-      if (value > highest) {
-        highest = value;
-      }
-      if (value < lowest) {
-        lowest = value;
-      }
-      StepperController::setStepsToStep(-4);// move backwards to make this behavior easier to see/understand
-      while (StepperController::getStepsToStep() != 0) { ; }
-    } // steps while fullstepping around
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if (serialCanWrite) { Serial.print(F("Reflectance range finding completed rotation "));
-    Serial.println(rotations+1);
-    }
-#endif
-#endif
-    } // rotations
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite){
-#ifndef DEBUG_REFLECTANCE_INIT_READINGS
-      Serial.println();
-#endif
-    Serial.print(F("Reflectance readings range from "));
-    Serial.print(lowest);
-    Serial.print(F(" to "));
-    Serial.print(highest);
-    Serial.println(F("."));
-}
-#endif
-#endif
-    if (highest - lowest < IR_REFLECTANCE_RANGE_REQUIRED)
-    {
-      error = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.println(F("Reflectance cannot be used: insufficient contrast!"));
-#endif
-#endif
-    }
-  }// if !error
-
-  // BUILD HISTOGRAM MICROSTEPPING
-  if (! error)
-  {
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.println(F("Microstep rotation to build reflectance histogram..."));
-#endif
-#endif
-    StepperController::setStepsToStep(0);
-    StepperController::runHalfstep();
-    for (int i = 0; i < IR_REFLECTANCE_READINGS; i++) {
-      value = IrReflectanceSensor::read();
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-#ifdef DEBUG_REFLECTANCE_INIT_READINGS
-      if (serialCanWrite) Serial.println(value);
-#else
-      if (serialCanWrite) Serial.print(hexcode[value / 64]);
-#endif
-#endif
-#endif
-      bin = (value - lowest) / ((highest-lowest)/ REFLECTANCE_BINCOUNT); // issue #18 - consider only active range?
-//      bin = value / (1024 / REFLECTANCE_BINCOUNT);
-      bin = constrain(bin,0,REFLECTANCE_BINCOUNT-1);
-      //smooth the histogram by adding 2 to this bin and 1 to adjacent bins (if they exist)
-      bins[bin] += 2;
-      if (bin >= 1) bins[bin - 1]++;
-      if (bin + 1 < REFLECTANCE_BINCOUNT) bins[bin + 1]++;
-      // move to next reading
-      StepperController::setStepsToStep(IR_REFLECTANCE_STEPS_PER_READ);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
-    }
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite) {
-    Serial.println();
-    Serial.println(F("Bins:"));
-    for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
-    {
-      Serial.print(i);
-      Serial.print(F(" ("));
-      Serial.print(i*((highest-lowest)/ REFLECTANCE_BINCOUNT) + lowest);
-      Serial.print(F("): "));
-      Serial.println(bins[i]);
-    }
-}
-#endif
-#endif
-    // find highest peak
-    maxCount = -1;
-    for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
-    {
-      if (bins[i] > maxCount) {
-        maxCount = bins[i];
-        peakOneBin = i;
-      }
-    }
-    // find extent of first peak
-    // consider a bin to be part of a peak if its count is > 1/3 of the peak-side neighbor.
-    peakOneBinMax = peakOneBin;
-    while (peakOneBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakOneBinMax + 1] > (1*bins[peakOneBinMax])/3 ) { peakOneBinMax++; }
-    peakOneBinMin = peakOneBin;
-    while (peakOneBinMin > 0 && bins[peakOneBinMin - 1] > (1*bins[peakOneBinMin])/3) { peakOneBinMin--; }
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite){
-    Serial.println();
-    Serial.print(F("Peak One: from bins"));
-    Serial.print(peakOneBinMin);
-    Serial.print(F("-"));
-    Serial.print(peakOneBinMax);
-    Serial.print(F(" with peak @ "));
-    Serial.println(peakOneBin);
-}
-#endif
-#endif
-    if (peakOneBinMin == 0 && peakOneBinMax + 1 == REFLECTANCE_BINCOUNT)
-    {
-      error = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.println(F("Reflectance histogram peak covers full range; cannot sense tape."));
-#endif
-#endif
-    }
-
-  }// if !error
-  if (!error) {
-    // find peak in remaining range
-    maxCount = -1; 
-    for (int i = 0; i < REFLECTANCE_BINCOUNT; i++)
-    {
-      if (i < peakOneBinMin || i > peakOneBinMax) // skip peakOne's range
-      {
-        if (bins[i] > maxCount) {
-          maxCount = bins[i];
-          peakTwoBin = i;
-        }
-      } // skip peakOne
-    } // for i in bins
-    // find extent of second peak
-    // consider a bin to be part of a peak if its count is > 1/3 of the peak-side neighbor.
-    peakTwoBinMax = peakTwoBin;
-    while (peakTwoBinMax + 1 < REFLECTANCE_BINCOUNT && bins[peakTwoBinMax + 1] > (1*bins[peakTwoBinMax])/3) peakTwoBinMax++;
-    peakTwoBinMin = peakTwoBin;
-    while (peakTwoBinMin > 0 && bins[peakTwoBinMin - 1] > (1*bins[peakTwoBinMin])/3) peakTwoBinMin--;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite) {
-    Serial.print(F("Peak Two: covers bins "));
-    Serial.print(peakTwoBinMin);
-    Serial.print(F("-"));
-    Serial.print(peakTwoBinMax);
-    Serial.print(F(" with peak at @ "));
-    Serial.println(peakTwoBin);
-}
-#endif
-#endif
-    if (bins[peakTwoBin] == 0)
-    {
-      error = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-      if (serialCanWrite) Serial.println(F("No observations outside range of first peak; cannot sense tape."));
-#endif
-#endif
-    }
-  } // !error
-  if (!error)
-  {
-    //find trough between peaks
-    if (peakOneBin < peakTwoBin)
-    {
-      troughBinMin = peakOneBinMax+1;
-      troughBinMax = peakTwoBinMin-1;
-    }
-    else
-    {
-      troughBinMin = peakTwoBinMax+1;
-      troughBinMax = peakOneBinMin-1;
-    }
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite) {
-    Serial.print(F("Trough: bins "));
-    Serial.print(troughBinMin);
-    Serial.print(F("-"));
-    Serial.println(troughBinMax);
-}
-#endif
-#endif
-    if (troughBinMax <= troughBinMin) {
-      error=true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite) {
-    Serial.print(F("Peaks overlap; cannot reliably separate high from low reflectance."));
-}
-#endif
-#endif
-    } else { // can calculate threshold between peaks
-    //was middle of the trough: value = reflectanceMin + ((troughBinMin + troughBinMax + 1) * (reflectanceRange / REFLECTANCE_BINCOUNT)) / 2;
-    //let's try 20% (1/5) into the trough:
-    value = lowest + troughBinMin * ((highest-lowest) / REFLECTANCE_BINCOUNT) + (((troughBinMax) * ((highest-lowest) / REFLECTANCE_BINCOUNT))/5);
-    IrReflectanceSensor::setPresentThreshold(value);
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-if(serialCanWrite) {
-    Serial.print(F("Reflectance threshold = "));
-    Serial.println(value);
-}
-#endif
-#endif
-    }//else peaks do not overlap
-  }//!error
-  IrReflectanceSensor::setDisabled(error);
-  if (!error) {
-    // find shortest usable span (issue #32)
-      int span = findShortestUsableSpan();
-      if(span>0) {
-        currentSettings.stepper_randomsteps_max = span / 2; // half the smallest span forwards
-        currentSettings.stepper_randomsteps_min = span * -5 / 7; // 70% of that backwards
-      }
-  }//!error 
-  if(error) {
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if (serialCanWrite) {Serial.println(F("Laser will be enabled full circle!"));}
-#endif
-#endif
-  }
-} // findReflectanceThreshold
-
-// attempts to find the shortest usable span to better set random stepping
-// if returned value <=0, then do not set stepping range; unable to determine appropriate value
-// See github issue #23
-int findShortestUsableSpan() {
-  // MATCH_STEPS determined experimentally to help ignore jitter in readings
-#define MATCH_STEPS 10
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.println(F("Looking for shortest usable span")); }
-#endif
-#endif
-    int stepsInCircle = STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR;
-    int shortestSpan = STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR; //full circle
-    bool currentStepIsPresent, previousStepIsPresent = IrReflectanceSensor::isPresent();
-    //first, find some tape, moving forward
-    long stepsStepped = 0L;
-    int matchingStepCount = 0;
-    while(matchingStepCount < MATCH_STEPS && stepsStepped < STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR) {
-      StepperController::setStepsToStep(1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
-      stepsStepped++;
-      currentStepIsPresent=IrReflectanceSensor::isPresent();
-      if(currentStepIsPresent && previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
-      previousStepIsPresent=currentStepIsPresent;
-    }
-    if (stepsStepped > stepsInCircle) return -1; //could not find tape
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.println(F("Found tape")); }
-#endif
-#endif
-    //second, find the end of the tape, moving backward (to make behavior easier to recognize)
-    stepsStepped = 0L;
-    matchingStepCount = 0;
-    while(matchingStepCount < MATCH_STEPS && stepsStepped < stepsInCircle) {
-      StepperController::setStepsToStep(-1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
-      stepsStepped++;
-      currentStepIsPresent=IrReflectanceSensor::isPresent();
-      if(!currentStepIsPresent && !previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
-      previousStepIsPresent=currentStepIsPresent;
-    }
-    if (stepsStepped > stepsInCircle) return -2; //could not find end of tape
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.println(F("Found end of tape")); }
-#endif
-#endif
-   bool inUsableSpan=true;
-   int spanLength = matchingStepCount;// we already saw this many usable steps
-   //cover the rest of the circle, still moving backward
-   matchingStepCount = 0;
-   for(int i = spanLength; i < stepsInCircle; i++) {
-      StepperController::setStepsToStep(-1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
-      currentStepIsPresent=IrReflectanceSensor::isPresent();
-      if(currentStepIsPresent == previousStepIsPresent) { matchingStepCount++; } else {matchingStepCount = 0; }
-      previousStepIsPresent=currentStepIsPresent;
-      if(inUsableSpan) {
-        if(currentStepIsPresent && matchingStepCount >= MATCH_STEPS) { // back to tape
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.print(F("Found end of span with length = ")); Serial.println(spanLength); }
-#endif
-#endif
-      if(spanLength>2*MATCH_STEPS) { // span counts toward shortest unless very short
-        shortestSpan=min(shortestSpan,spanLength);
-      }
-      inUsableSpan=false;
-      } // found tape
-      else {
-        spanLength++;
-      }// still in usable span
-   } // if inUsableSpan
-   else { // on tape
-    if(!currentStepIsPresent && matchingStepCount >= 2) { // back to span
-      spanLength=matchingStepCount;
-      inUsableSpan=true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.print(F("Found beginning of another span")); Serial.println(spanLength); }
-#endif
-#endif    
-      } // if we found another span
-    } // else not in span
-   }//for steps around the circle
-  if(inUsableSpan) { // shouldn't happen at end of circle, but maybe?
-    shortestSpan=min(shortestSpan,spanLength);
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.print(F("Ended on span with length = ")); Serial.println(spanLength); }
-#endif
-#endif
-  }
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_REFLECTANCE
-    if(serialCanWrite) { Serial.print(F("Shortest meaningful span is = ")); Serial.println(shortestSpan); }
-#endif
-#endif
-  return shortestSpan;
-} // function findShortestUsableSpan

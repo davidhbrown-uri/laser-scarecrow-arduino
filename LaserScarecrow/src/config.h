@@ -7,12 +7,19 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.3 - August 6, 2019 release")
+#define SOFTWARE_VERSION F("Version 2.6.0 - August 19 2020 release for 2020 kits")
 
 /*******************
    VERSION HISTORY
  *******************
+  2.6.0 - 2020-08-19: Move IR tape threshold scan to class IrThreshol; streamline initialization with single read pass to memory
 
+  2.5.1 - 2020-08: tweak tape sensor threshold to be in middle of trough instead of 20%; tweaks to seeking behavior
+  
+  2.5.0 - configure for 2020 kits (no RTC, set unused pins to pullup, direct drive speed boost)
+
+  2.3.2 - increase speed for direct drive
+  
   2.3.1 - remove RTC support. Never going to be used vs. ambient light; don't need the battery-backed RAM, either (using EEPROM)
 
   2.3.0 - better support for Bluetooth control and tape sensor. 
@@ -80,8 +87,10 @@
  * Default behavior configuration
  */
 
-#define STEPPER_RANDOMSTEPS_MIN -70
-#define STEPPER_RANDOMSTEPS_MAX 100
+// overall speed:
+#define INTERRUPT_FREQUENCY_DEFAULT 200
+#define STEPPER_RANDOMSTEPS_MIN -50
+#define STEPPER_RANDOMSTEPS_MAX 80
 #define STEPPER_STEPS_WHILE_SEEKING 17
 /* Ambient lux levels measured by ColorMunki -> threshold values
     Per https://en.wikipedia.org/wiki/Lux dark limit of twilight is 3.4 lux
@@ -127,38 +136,46 @@
 #define SERVO_PULSE_USABLE_MAX 2050
 #define SERVO_PULSE_DELTA_LIMIT 5
 
+// based on the stepper motor:
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
 // these adjust the rate of updates
 #define SERVO_POSTSCALE_MASK 0x0f
 #define SERVO_POSTSCALE_MASK_SEEKING 0xFF
 // had been 0x3f
-#define STEPPER_POSTSCALE_MASK 0x02
-// had been 0x1f
+#define STEPPER_POSTSCALE_MASK 0x00
+// had been 0x1f; changed to 0x02 for belt drive; 0x00 for direct drive?
 #define STEPPER_POSTSCALE_MASK_SEEKING 0x00
-#define STEPPER_STEPS_PER_REVOLUTION 200
 #define STEPPER_MICROSTEPPING_DIVISOR 2
 // IR Reflectance readings are done during microstepping, so readings * step per read should equal 400 (200 if done at full speed)
-//in testing black tape on white bucket, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
-#define IR_REFLECTANCE_READINGS 100
-#define IR_REFLECTANCE_STEPS_PER_READ STEPPER_STEPS_PER_REVOLUTION * STEPPER_MICROSTEPPING_DIVISOR / IR_REFLECTANCE_READINGS
+// in testing black tape on white bucket, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
+// 2020-08: now requires 2 bytes RAM for each reading; must be divisor of (STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR)
+#define IR_REFLECTANCE_READINGS 200
+#define IR_REFLECTANCE_STEPS_PER_READ (STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / IR_REFLECTANCE_READINGS)
 //these 2017 values for black tape on white bucket:
 #define IR_REFLECTANCE_MID_READ_LIMIT 10
 #define IR_REFLECTANCE_DEFAULT_PRESENT 550
-//no longer used with better calibration algorithm: #define IR_REFLECTANCE_DEFAULT_ABSENT 400
+// minimum difference in raw readings required to use reflectance:
+#define IR_REFLECTANCE_RANGE_REQUIRED 100
+// how often to recalibrate the refelctance readings (ms: 3600000 = 1h production; 60000 = 1min testing)
+#define IR_REFLECTANCE_RECALIBRATE_MS 3600000
+// Default checks for reflective tape, i.e., aluminum on black bucket.
+// Set true to check for black tape on white bucket instead:
+#define IR_REFLECTANCE_INVERT false
+// how far through the trough from low readings to high readings should the threshold be set? (2020-08-14)
+// experimentally, 72 seems to target an area in the trough with very few readings
+// #define IR_REFLECTANCE_THRESHOLD_TROUGH_PERCENT 72
+// better idea: upper and lower threshold; must cross far side to switch
+#define IR_REFLECTANCE_UPPER_THRESHOLD_TROUGH_PERCENT 75
+#define IR_REFLECTANCE_LOWER_THRESHOLD_TROUGH_PERCENT 25
+// how many samples to average when finding the initial thresholds
+#define IR_REFLECTANCE_SCANNING_AVERAGING 3
+// Ignore minimum usable span below quarter circle
+#define IR_REFLECTANCE_MINIMUM_USABLE_SPAN (STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 4)
 //when seeking for the tape, the system will make
 //at most this many full rotations; if
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
 #define IR_REFLECTANCE_SEEKING_ROTATION_LIMIT 2
-#define IR_REFLECTANCE_SEEKING_STEPS_PER_READ 4
-// minimum difference in raw readings required to use reflectance:
-#define IR_REFLECTANCE_RANGE_REQUIRED 100
-// how often to recalibrate the refelctance readings (ms: 3600000 = 1h production; 60000 = 1min testing)
-#define IR_REFLECTANCE_RECALIBRATE_MS 3600000
-// to use reflective tape on a non-reflective (black) bucket (e.g., 2018 kits),
-// invert the logic of the isPresent, isAbsent tests (leave actual values alone):
-#define IR_REFLECTANCE_INVERT
-
 //how often the RTC should refresh
 #define RTC_REFRESH_MILLIS 2000
 
@@ -198,7 +215,7 @@
 #define INTERRUPT_FREQUENCY_KNOB_READINGS_TO_AVERAGE 5
 #define COMMAND_PROCESSOR_ENABLE_USB
 #define COMMAND_PROCESSOR_STREAM_USB Serial
-#define COMMAND_PROCESSOR_DATARATE_USB 57600
+#define COMMAND_PROCESSOR_DATARATE_USB 115200
 #define COMMAND_PROCESSOR_ENABLE_BLUETOOTH
 #define COMMAND_PROCESSOR_STREAM_BLUETOOTH Serial1
 #define COMMAND_PROCESSOR_DATARATE_BLUETOOTH 38400
@@ -208,6 +225,9 @@
  *
  ********************/
 
+#define UNUSED_PIN_COUNT 4
+#define UNUSED_PINS {2, 3, 4, 15}
+
 // use 8-bit timer 2 for ATmega328 (UNO, Pro Mini)
 // # define INTERRUPTS_ATmega328P_T2
 // use timer 1 or 3 for ATmega32u4 (Leonardo, Micro)
@@ -215,7 +235,6 @@
 // # define INTERRUPTS_ATmega32U4_T1
 #define INTERRUPTS_ATmega32U4_T3
 
-// Pin assignments valid April 2017 through at least June 2018
 // for Arduino Pro Micro (Sparkfun design)
 
 #define AMBIENTLIGHTSENSOR_PIN A0
@@ -225,8 +244,6 @@
 
 #define IR_REFLECTANCE_PIN A10
 
-#define RTC_PIN_SDA 2
-#define RTC_PIN_SCL 3
 
 // Bluetooth is on Serial1 at pins 0/1
 // also have to initialize the pins in setup:
@@ -257,14 +274,16 @@
  * DEBUG Flags
  */
 #define DEBUG_SERIAL
-#define DEBUG_SERIAL_DATARATE 57600
+// serial debug data rate will use COMMAND_PROCESSOR_DATARATE_USB
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
-#define DEBUG_SERIAL_COUNTDOWN_SECONDS 4
+// increase somewhat while debugging to make serial connection easier; 4 for production
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 3
+//#define DEBUG_LOOP_TIME
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
-//#define DEBUG_REFLECTANCE_INIT_READINGS
+#define DEBUG_REFLECTANCE_THRESHOLD
 //#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
