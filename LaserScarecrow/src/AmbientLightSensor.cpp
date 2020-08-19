@@ -11,7 +11,7 @@
 
 int AmbientLightSensor::_threshold;
 int AmbientLightSensor::_readings[AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE];
-int AmbientLightSensor::_readingsIndex;
+int AmbientLightSensor::_readingsIndex = 0;
 int AmbientLightSensor::_average;
 unsigned long AmbientLightSensor::_lastReadingMillis;
 
@@ -31,7 +31,8 @@ void AmbientLightSensor::update()
 {
   if (millis() - _lastReadingMillis > AMBIENTLIGHTSENSOR_READ_INTERVAL_MS)
   {
-    _readingsIndex = ++_readingsIndex % AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE;
+    _readingsIndex++;
+    _readingsIndex = _readingsIndex % AMBIENTLIGHTSENSOR_READINGS_TO_AVERAGE;
     _readings[_readingsIndex] = analogRead(AMBIENTLIGHTSENSOR_PIN);
     unsigned long sum = 0L;
 #ifdef DEBUG_SERIAL
@@ -44,6 +45,9 @@ void AmbientLightSensor::update()
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_LIGHTSENSOR
       Serial.print(F(" "));
+      if(i==_readingsIndex) {
+        Serial.print(F("*"));
+      }
       Serial.print(_readings[i]);
 #endif
 #endif
@@ -55,8 +59,6 @@ void AmbientLightSensor::update()
 #ifdef DEBUG_LIGHTSENSOR
     Serial.print(F("; average="));
     Serial.print(_average);
-    Serial.print(F("; readingsIndex: "));
-    Serial.print(_readingsIndex);
 #endif
 #endif
   }

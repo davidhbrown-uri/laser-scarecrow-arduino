@@ -161,6 +161,7 @@ void Command::write(int inByte)
       }
       break; // CSTATE_GET_PARAM
 
+    case CSTATE_NEED_LETTER:
     case CSTATE_OK:
     case CSTATE_ERROR:
       ;//tempting to assert an error as characters can't be processed in this state, but no point on an Arduino
