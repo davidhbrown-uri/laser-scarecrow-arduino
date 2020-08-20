@@ -47,6 +47,8 @@ extern bool stateManual;
 #define CPCODE_TapeSensor 151
 #define CPCODE_RtcControl 201
 #define CPCODE_LightSensorRead 210
+#define CPCODE_LightSensorReadMin 211
+#define CPCODE_LightSensorReadMax 212
 #define CPCODE_LightThrehold 221
 
 

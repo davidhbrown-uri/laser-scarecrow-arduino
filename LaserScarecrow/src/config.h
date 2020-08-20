@@ -7,12 +7,14 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.6.0 - August 19 2020 release for 2020 kits")
+#define SOFTWARE_VERSION F("Version 2.6.1 - August 2020 release for 2020 kits")
 
 /*******************
    VERSION HISTORY
  *******************
-  2.6.0 - 2020-08-19: Move IR tape threshold scan to class IrThreshol; streamline initialization with single read pass to memory
+  2.6.1 - 2020-08-20: Light threshold: store / access min and max since power-on; fix rolling average in first n readings.
+
+  2.6.0 - 2020-08-19: Move IR tape threshold scan to class IrThreshold; streamline initialization with single read pass to memory
 
   2.5.1 - 2020-08: tweak tape sensor threshold to be in middle of trough instead of 20%; tweaks to seeking behavior
   
@@ -281,9 +283,9 @@
 //#define DEBUG_LOOP_TIME
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
-//#define DEBUG_LIGHTSENSOR
+#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
-#define DEBUG_REFLECTANCE_THRESHOLD
+//#define DEBUG_REFLECTANCE_THRESHOLD
 //#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
