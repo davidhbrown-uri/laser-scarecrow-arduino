@@ -95,6 +95,14 @@ void CommandProcessor::process()
             stream->println(AmbientLightSensor::read());
             processOK();
             break;
+          case CPCODE_LightSensorReadMin:
+            stream->println(AmbientLightSensor::minimum_reading());
+            processOK();
+            break;
+          case CPCODE_LightSensorReadMax:
+            stream->println(AmbientLightSensor::maximum_reading());
+            processOK();
+            break;
           case CPCODE_LightThrehold:
             stream->println(settings->light_sensor_threshold);
             processOK();
