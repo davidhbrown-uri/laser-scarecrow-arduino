@@ -7,11 +7,13 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.6.1 - August 2020 release for 2020 kits")
+#define SOFTWARE_VERSION F("Version 2.6.2 - August 2020 release for 2020 kits")
 
 /*******************
    VERSION HISTORY
  *******************
+  2.6.2 - 2020-08-21: Can now skip forward or backward over tape; pretty much eliminates chatter/grinding previously experienced when backing into tape
+  
   2.6.1 - 2020-08-20: Light threshold: store / access min and max since power-on; fix rolling average in first n readings.
 
   2.6.0 - 2020-08-19: Move IR tape threshold scan to class IrThreshold; streamline initialization with single read pass to memory
@@ -163,6 +165,8 @@
 // Default checks for reflective tape, i.e., aluminum on black bucket.
 // Set true to check for black tape on white bucket instead:
 #define IR_REFLECTANCE_INVERT false
+
+#define IR_REFLECTANCE_NO_WHOLE_STEP
 // how far through the trough from low readings to high readings should the threshold be set? (2020-08-14)
 // experimentally, 72 seems to target an area in the trough with very few readings
 // #define IR_REFLECTANCE_THRESHOLD_TROUGH_PERCENT 72
@@ -278,12 +282,12 @@
 #define DEBUG_SERIAL
 // serial debug data rate will use COMMAND_PROCESSOR_DATARATE_USB
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
-// increase somewhat while debugging to make serial connection easier; 4 for production
+// increase somewhat while debugging to make serial connection easier; 3 for production
 #define DEBUG_SERIAL_COUNTDOWN_SECONDS 3
 //#define DEBUG_LOOP_TIME
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
-#define DEBUG_LIGHTSENSOR
+//#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_THRESHOLD
 //#define DEBUG_SETTINGS

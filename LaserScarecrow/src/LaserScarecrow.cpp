@@ -43,9 +43,9 @@ int findShortestUsableSpan();
 /*****************
    GLOBALS
 */
-bool serialCanWrite=false;
+bool serialCanWrite = false;
 byte stateCurrent, statePrevious;
-bool stateManual=false;
+bool stateManual = false;
 unsigned long manualLaserPulseMillis;
 byte manualLaserPulseMask;
 
@@ -80,24 +80,26 @@ AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
 
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_LOOP_TIME
-unsigned long loopCount=0L;
+unsigned long loopCount = 0L;
 #endif
 #endif
 /*************************************
    SETUP
 */
 
-void setup() {
+void setup()
+{
   // put your setup code here, to run once:
 
   /*************************
      INITIALIZE I/O
   */
 
-  int unused_pins[UNUSED_PIN_COUNT] = UNUSED_PINS ;
-  for(int i = 0; i < UNUSED_PIN_COUNT; i++) {
+  int unused_pins[UNUSED_PIN_COUNT] = UNUSED_PINS;
+  for (int i = 0; i < UNUSED_PIN_COUNT; i++)
+  {
     pinMode(unused_pins[i], INPUT_PULLUP);
-  } 
+  }
 
   // Knobs
   knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
@@ -115,7 +117,6 @@ void setup() {
 
   pinMode(BT_PIN_STATE, INPUT);
 
-
   /*********************
      Settings, Configuration, and command processors
   */
@@ -129,25 +130,25 @@ void setup() {
   uProcessor.setSettings(&currentSettings);
   //future:  uProcessor.setConfiguration(&configuration);
   //future:  uProcessor.setRTC(&rtc);
-  uProcessor.setStream(& COMMAND_PROCESSOR_STREAM_USB);
+  uProcessor.setStream(&COMMAND_PROCESSOR_STREAM_USB);
 #endif
 #ifndef COMMAND_PROCESSOR_ENABLE_USB
 #ifdef DEBUG_SERIAL
-Serial.begin(COMMAND_PROCESSOR_DATARATE_USB);
+  Serial.begin(COMMAND_PROCESSOR_DATARATE_USB);
 #endif
 #endif
 
 #ifdef COMMAND_PROCESSOR_ENABLE_BLUETOOTH
-  pinMode(BT_PIN_STATE, INPUT);// Should be high when connected, low when not
-  pinMode(BT_PIN_RXD, INPUT); // is this going to be handled by Serial1.begin?
-  pinMode(BT_PIN_TXD, OUTPUT);// is this going to be handled by Serial1.begin?
+  pinMode(BT_PIN_STATE, INPUT); // Should be high when connected, low when not
+  pinMode(BT_PIN_RXD, INPUT);   // is this going to be handled by Serial1.begin?
+  pinMode(BT_PIN_TXD, OUTPUT);  // is this going to be handled by Serial1.begin?
   COMMAND_PROCESSOR_STREAM_BLUETOOTH.begin(COMMAND_PROCESSOR_DATARATE_BLUETOOTH);
   btCommand.init();
   btProcessor.setCommand(&btCommand);
   btProcessor.setSettings(&currentSettings);
   //future:  btProcessor.setConfiguration(&configuration);
   //future:  btProcessor.setRTC(&rtc);
-  btProcessor.setStream(& COMMAND_PROCESSOR_STREAM_BLUETOOTH);
+  btProcessor.setStream(&COMMAND_PROCESSOR_STREAM_BLUETOOTH);
 #ifdef DEBUG_BLUETOOTH
   COMMAND_PROCESSOR_STREAM_BLUETOOTH.println(SOFTWARE_VERSION);
 #endif
@@ -164,7 +165,8 @@ Serial.begin(COMMAND_PROCESSOR_DATARATE_USB);
    LOOP
 */
 
-void loop() { // put your main code here, to run repeatedly:
+void loop()
+{ // put your main code here, to run repeatedly:
 
   /////// BEFORE any STATE
 
@@ -185,13 +187,16 @@ void loop() { // put your main code here, to run repeatedly:
   // if the Bluetooth state has changed, enter or leave the manual control state
   if (digitalRead(BT_PIN_STATE))
   {
-    if (!bt_connected) {
+    if (!bt_connected)
+    {
       stateManual = true;
     }
     bt_connected = true;
   }
-  else {
-    if (bt_connected) {
+  else
+  {
+    if (bt_connected)
+    {
       stateManual = false;
     }
     bt_connected = false;
@@ -214,288 +219,337 @@ void loop() { // put your main code here, to run repeatedly:
       }
     break;
   */
-  switch (stateCurrent) {
-    /*********************
+  switch (stateCurrent)
+  {
+  /*********************
       POWERON
     *********************/
-    case STATE_POWERON:
-      currentSettings.init();
-      StepperController::init();
-      StepperController::stop();
+  case STATE_POWERON:
+    currentSettings.init();
+    StepperController::init();
+    StepperController::stop();
 // Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
-      if (serialCanWrite) Serial.println();
-      for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--) {
-        serialCanWrite = Serial && Serial.availableForWrite() > 16;
-        if(serialCanWrite) {
-          Serial.print(F("Laser Scarecrow Startup in "));
-          Serial.print(i);
-          Serial.println(F("..."));
-        }
-        delay(1000);
+    if (serialCanWrite)
+      Serial.println();
+    for (int i = DEBUG_SERIAL_COUNTDOWN_SECONDS; i >= 0; i--)
+    {
+      serialCanWrite = Serial && Serial.availableForWrite() > 16;
+      if (serialCanWrite)
+      {
+        Serial.print(F("Laser Scarecrow Startup in "));
+        Serial.print(i);
+        Serial.println(F("..."));
       }
+      delay(1000);
+    }
 #endif // DEBUG_SERIAL
-      stateCurrent = STATE_INIT;
-      break;
+    stateCurrent = STATE_INIT;
+    break;
 
-    /*********************
+  /*********************
       INIT
     *********************/
-    case STATE_INIT:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        // onEnter code:
+  case STATE_INIT:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      // onEnter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering INIT State]]"));
-#endif 
-        if (SettingsObserver::load(&currentSettings))
-        {
-#ifdef DEBUG_SERIAL
-          if (serialCanWrite) Serial.println(F("Loaded settings from storage."));
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering INIT State]]"));
 #endif
-          ;
-        }
-        else
-        {
+      if (SettingsObserver::load(&currentSettings))
+      {
 #ifdef DEBUG_SERIAL
-          if (serialCanWrite) Serial.println(F("Could not load settings from storage."));
+        if (serialCanWrite)
+          Serial.println(F("Loaded settings from storage."));
 #endif
-          ;
-        }
-        LaserController::init();
-        ServoController::init();
-        StepperController::init();
-        IrReflectanceSensor::init();
-        AmbientLightSensor::init();
-        Interrupt::init();
-}// finish /enter code
-      //update:
-      stateCurrent = STATE_INIT_REFLECTANCE;
-      if (stateCurrent != statePrevious) {
-        //exit code:
+        ;
       }
-      break;
+      else
+      {
+#ifdef DEBUG_SERIAL
+        if (serialCanWrite)
+          Serial.println(F("Could not load settings from storage."));
+#endif
+        ;
+      }
+      LaserController::init();
+      ServoController::init();
+      StepperController::init();
+      IrReflectanceSensor::init();
+      AmbientLightSensor::init();
+      Interrupt::init();
+    } // finish /enter code
+    //update:
+    stateCurrent = STATE_INIT_REFLECTANCE;
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+    }
+    break;
 
     /*********************
      INIT_REFLECTANCE
      *********************/
-     case STATE_INIT_REFLECTANCE:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        //enter code:
+  case STATE_INIT_REFLECTANCE:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      //enter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering INIT_REFLECTANCE State]]"));
-#endif 
-        LaserController::turnOff();
-        LaserController::update();// because this operation isn't looping
-        ServoController::stop();
-        StepperController::stop();
-        Interrupt::applySettings(& currentSettings);
-        //laser is on here
-      }//end enter code
-      // do/ :
-      IrThreshold::setReflectanceThreshold();
-      stateCurrent = STATE_DARK;
-      if (stateCurrent != statePrevious) {
-        //exit code:
-        stateInitReflectanceMillis = millis();
-      }
-      break;
-    /*********************
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering INIT_REFLECTANCE State]]"));
+#endif
+      LaserController::turnOff();
+      LaserController::update(); // because this operation isn't looping
+      ServoController::stop();
+      StepperController::stop();
+      Interrupt::applySettings(&currentSettings);
+      //laser is on here
+    } //end enter code
+    // do/ :
+    IrThreshold::setReflectanceThreshold();
+    stateCurrent = STATE_DARK;
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+      stateInitReflectanceMillis = millis();
+    }
+    break;
+  /*********************
       ACTIVE
     *********************/
-    case STATE_ACTIVE:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        //enter code:
+  case STATE_ACTIVE:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      //enter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering ACTIVE State]]"));
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering ACTIVE State]]"));
 #endif // DEBUG_SERIAL
-        Interrupt::applySettings(& currentSettings);
-        LaserController::turnOn();
-        ServoController::run();
-        StepperController::runHalfstep();
-// don't do this on entry, as it's might have been set by STATE_SEEKING; only do it if stepsToStep==0, below
-//        StepperController::setStepsToStepRandom(
-//          currentSettings.stepper_randomsteps_min,
-//          currentSettings.stepper_randomsteps_max);
-      }
-      //update:
-      // check for transition events (later checks have priority)
-      if (millis()-stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS) {
-        stateInitReflectanceMillis=millis();
-        stateCurrent = STATE_INIT_REFLECTANCE;
-      }
-      if (IrReflectanceSensor::isPresent()) stateCurrent = STATE_SEEKING;
-      if (LaserController::isCoolingDown()) stateCurrent = STATE_COOLDOWN;
+      Interrupt::applySettings(&currentSettings);
+      LaserController::turnOn();
+      ServoController::run();
+      StepperController::runHalfstep();
+      // don't do this on entry, as it's might have been set by STATE_SEEKING; only do it if stepsToStep==0, below
+      //        StepperController::setStepsToStepRandom(
+      //          currentSettings.stepper_randomsteps_min,
+      //          currentSettings.stepper_randomsteps_max);
+    }
+    //update:
+    // check for transition events (later checks have priority)
+    if (millis() - stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS)
+    {
+      stateInitReflectanceMillis = millis();
+      stateCurrent = STATE_INIT_REFLECTANCE;
+    }
+    if (IrReflectanceSensor::isPresent())
+      stateCurrent = STATE_SEEKING;
+    if (LaserController::isCoolingDown())
+      stateCurrent = STATE_COOLDOWN;
 
-      // do not go dark if BT is connected, issue #37
-      if (!bt_connected && AmbientLightSensor::isDark()) {
-        stateCurrent = STATE_DARK;
-      }
-      // do our things:
-      if (StepperController::getStepsToStep() == 0) StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
-      if (stateManual) {
-        stateCurrent = STATE_MANUAL;
-      }
-      if (stateCurrent != statePrevious) {
-        //exit code:
-      }
-      break;
-    /*********************
+    // do not go dark if BT is connected, issue #37
+    if (!bt_connected && AmbientLightSensor::isDark())
+    {
+      stateCurrent = STATE_DARK;
+    }
+    // do our things:
+    if (StepperController::getStepsToStep() == 0)
+      StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
+    if (stateManual)
+    {
+      stateCurrent = STATE_MANUAL;
+    }
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+    }
+    break;
+  /*********************
       SEEKING
     *********************/
-    case STATE_SEEKING:
-      if (stateCurrent != statePrevious) { // onEntry
-        statePrevious = stateCurrent;
+  case STATE_SEEKING:
+    bool seeking_backwards;
+    if (stateCurrent != statePrevious)
+    { // onEntry
+      statePrevious = stateCurrent;
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering SEEKING State]]"));
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
-        StepperController::setStepsToStep(1); // trying to avoid backing into tape 2020-08-10
-        Interrupt::applySettings(& currentSettings);
-        LaserController::turnOff();
-        StepperController::setStepsToStep(0);
-        ServoController::stop();
-        StepperController::runFullstep();
-        StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
-        seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
-      }
-      //update:
-      //check for transition
-      if (!IrReflectanceSensor::isPresent())
-      {
-        stateCurrent = STATE_ACTIVE;
-        // force some forward movement to avoid lots of chattering at trailing edge of tape
-        // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
-        // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
-        StepperController::setStepsToStep(random(currentSettings.stepper_randomsteps_max/2,currentSettings.stepper_randomsteps_max));
-      }
-      //do our things:
-      if (StepperController::getStepsToStep() == 0)
-      {
-        StepperController::setStepsToStep(currentSettings.stepper_stepsWhileSeeking);
-        seekingRotationLimitCountdown--;
-      }
-      if (seekingRotationLimitCountdown == 0)
-      {
-        stateCurrent = STATE_INIT_REFLECTANCE;
-      }
-      if (stateManual) {
-        stateCurrent = STATE_MANUAL;
-      }
-      if (stateCurrent != statePrevious) {
-        //exit code:
-      }
-      break;
-    /*********************
+      Interrupt::applySettings(&currentSettings);
+      LaserController::turnOff();
+      ServoController::stop();
+      StepperController::runFullstep();
+      seeking_backwards = StepperController::getStepsToStep() < 0;
+      seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
+      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
+    }
+    //update:
+    //check for transition
+    if (!IrReflectanceSensor::isPresent())
+    {
+      stateCurrent = STATE_ACTIVE;
+      // force some additional movement to avoid lots of chattering at trailing edge of tape
+      // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
+      // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
+      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * (random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max)));
+    }
+    //do our things:
+    if (StepperController::getStepsToStep() == 0)
+    {
+      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
+      seekingRotationLimitCountdown--;
+    }
+    if (seekingRotationLimitCountdown == 0)
+    {
+      stateCurrent = STATE_INIT_REFLECTANCE;
+    }
+    if (stateManual)
+    {
+      stateCurrent = STATE_MANUAL;
+    }
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+    }
+    break;
+  /*********************
       DARK
     *********************/
-    case STATE_DARK:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        //enter code:
+  case STATE_DARK:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      //enter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering DARK State]]"));
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering DARK State]]"));
 #endif // DEBUG_SERIAL
-        LaserController::turnOff();
-        ServoController::stop();
-        StepperController::stop();
-        // might save a bit of power, but mostly wanting a slow blink rate:
-        Interrupt::setFrequency(1);
-      }
-      //update:
-      if (AmbientLightSensor::isLight()) {
-        stateCurrent = STATE_SEEKING;
-      }
-      if (stateManual) {
-        stateCurrent = STATE_MANUAL;
-      }
-      if (stateCurrent != statePrevious) {
-        //exit code:
-      }
-      break;
-    /*********************
+      LaserController::turnOff();
+      ServoController::stop();
+      StepperController::stop();
+      // might save a bit of power, but mostly wanting a slow blink rate:
+      Interrupt::setFrequency(1);
+    }
+    //update:
+    if (AmbientLightSensor::isLight())
+    {
+      stateCurrent = STATE_SEEKING;
+    }
+    if (stateManual)
+    {
+      stateCurrent = STATE_MANUAL;
+    }
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+    }
+    break;
+  /*********************
       COOLDOWN
     *********************/
-    case STATE_COOLDOWN:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        //enter code:
+  case STATE_COOLDOWN:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      //enter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering COOLDOWN State]]"));
-#endif // DEBUG_SERIAL
-        LaserController::turnOff(); // it may already have done this itself.
-        //servo detach
-        ServoController::stop();
-        StepperController::runHalfstep();
-        StepperController::setStepsToStep(0);
-        // might save a bit of power, but mostly wanting a moderate blink rate:
-        Interrupt::setFrequency(3);
-      }
-      //update:
-      if (!LaserController::isCoolingDown())
-      {
-        stateCurrent = STATE_ACTIVE;
-      }
-      if (stateManual) {
-        stateCurrent = STATE_MANUAL;
-      }
-      if (stateCurrent != statePrevious) {
-        //exit code:
-      }
-      break;
-      /**************************
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering COOLDOWN State]]"));
+#endif                            // DEBUG_SERIAL
+      LaserController::turnOff(); // it may already have done this itself.
+      //servo detach
+      ServoController::stop();
+      StepperController::runHalfstep();
+      StepperController::setStepsToStep(0);
+      // might save a bit of power, but mostly wanting a moderate blink rate:
+      Interrupt::setFrequency(3);
+    }
+    //update:
+    if (!LaserController::isCoolingDown())
+    {
+      stateCurrent = STATE_ACTIVE;
+    }
+    if (stateManual)
+    {
+      stateCurrent = STATE_MANUAL;
+    }
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+    }
+    break;
+    /**************************
        * MANUAL
        ************************/
-    case STATE_MANUAL:
-      if (stateCurrent != statePrevious) {
-        statePrevious = stateCurrent;
-        //enter code:
+  case STATE_MANUAL:
+    if (stateCurrent != statePrevious)
+    {
+      statePrevious = stateCurrent;
+      //enter code:
 #ifdef DEBUG_SERIAL
-        if (serialCanWrite) Serial.println(F("\r\n[[Entering MANUAL State]]"));
+      if (serialCanWrite)
+        Serial.println(F("\r\n[[Entering MANUAL State]]"));
 #endif // DEBUG_SERIAL
-        Interrupt::applySettings(& currentSettings);
-        LaserController::turnOff();
-        StepperController::runHalfstep();
-        StepperController::setStepsToStep(0);
-        ServoController::runManually();
-        manualLaserPulseMillis=millis();
-      } // enter code
-      // manual behaviors mostly done by command processor
-      // here, we only need to pulse the laser depending on whether tape is sensed
-      if(millis()-manualLaserPulseMillis > STATE_MANUAL_LASER_PULSE_MS) {
-        manualLaserPulseMask = manualLaserPulseMask==0 ? STATE_MANUAL_LASER_PULSE_PATTERN : manualLaserPulseMask >> 1;
-        manualLaserPulseMillis = millis();
-        if(IrReflectanceSensor::isPresent()) {
-          if((manualLaserPulseMask & B00000001) == B00000001) {
-            LaserController::turnOn();
-          } else {
-            LaserController::turnOff();
-          }
-        } else { // no reflectance
-          if((manualLaserPulseMask & B00000001) == B00000001) {
-            LaserController::turnOff();
-          } else {
-            LaserController::turnOn();
-          }          
-        } // else no reflectance
-      } // manual mode laser pulse
-      
-      if (!stateManual) {
-        stateCurrent = STATE_ACTIVE;
-        // don't want to go to POWERON or INIT; unstored settings would be overwritten.
+      Interrupt::applySettings(&currentSettings);
+      LaserController::turnOff();
+      StepperController::runHalfstep();
+      StepperController::setStepsToStep(0);
+      ServoController::runManually();
+      manualLaserPulseMillis = millis();
+    } // enter code
+    // manual behaviors mostly done by command processor
+    // here, we only need to pulse the laser depending on whether tape is sensed
+    if (millis() - manualLaserPulseMillis > STATE_MANUAL_LASER_PULSE_MS)
+    {
+      manualLaserPulseMask = manualLaserPulseMask == 0 ? STATE_MANUAL_LASER_PULSE_PATTERN : manualLaserPulseMask >> 1;
+      manualLaserPulseMillis = millis();
+      if (IrReflectanceSensor::isPresent())
+      {
+        if ((manualLaserPulseMask & B00000001) == B00000001)
+        {
+          LaserController::turnOn();
+        }
+        else
+        {
+          LaserController::turnOff();
+        }
       }
-      if (stateCurrent != statePrevious) {
-        //exit code:
-        ServoController::applySettings(& currentSettings);
-      }
-      break;
-    default:
+      else
+      { // no reflectance
+        if ((manualLaserPulseMask & B00000001) == B00000001)
+        {
+          LaserController::turnOff();
+        }
+        else
+        {
+          LaserController::turnOn();
+        }
+      } // else no reflectance
+    }   // manual mode laser pulse
+
+    if (!stateManual)
+    {
+      stateCurrent = STATE_ACTIVE;
+      // don't want to go to POWERON or INIT; unstored settings would be overwritten.
+    }
+    if (stateCurrent != statePrevious)
+    {
+      //exit code:
+      ServoController::applySettings(&currentSettings);
+    }
+    break;
+  default:
 #ifdef DEBUG_SERIAL
-      if (serialCanWrite) Serial.println(F("\r\n[[Unknown State requested]]"));
-#endif // DEBUG_SERIAL
-      stateCurrent = statePrevious; //or INIT? POWERON?
-  } // switch STATE
+    if (serialCanWrite)
+      Serial.println(F("\r\n[[Unknown State requested]]"));
+#endif                            // DEBUG_SERIAL
+    stateCurrent = statePrevious; //or INIT? POWERON?
+  }                               // switch STATE
 
   ///////// AFTER ANY STATE:
 
@@ -508,7 +562,7 @@ void loop() { // put your main code here, to run repeatedly:
 
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_LOOP_TIME
-loopCount++;
+  loopCount++;
 #endif
   long loopsTotalDuration = millis() - loopLastSerial;
   loopLastSerial = millis();
@@ -523,7 +577,7 @@ loopCount++;
     Serial.print(loopsTotalDuration);
     Serial.print(F(" / "));
     Serial.println(loopCount);
-    loopCount=0L;
+    loopCount = 0L;
 #endif
     Serial.println(SOFTWARE_VERSION);
 #ifdef DEBUG_SETTINGS_VERBOSE
@@ -532,9 +586,11 @@ loopCount++;
 #ifdef DEBUG_REFLECTANCE
     Serial.print(F("\r\nIR raw="));
     Serial.print(IrReflectanceSensor::read());
-    if(IrReflectanceSensor::isDisabled()) {
+    if (IrReflectanceSensor::isDisabled())
+    {
       Serial.println(F(" (disabled)"));
-    } else
+    }
+    else
     {
       Serial.println(IrReflectanceSensor::isPresent() ? F(" (tape present)") : F(" (no tape)"));
     }
@@ -576,7 +632,6 @@ loopCount++;
   } //output serial debug
 #endif
 } // END main Arduino loop
-
 
 /*********************
    INTERRUPT HANDLERS
