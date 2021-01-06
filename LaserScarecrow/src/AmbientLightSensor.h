@@ -15,6 +15,8 @@
   a good range of readings, 760 in room light, 160 in hand's
   shadow, and 1000 under the lamp.
 
+  (Production boards use a standard 10k resistor)
+
   Twilight generally reads similar resistance to room light.
 */
 #ifndef AmbientLightSensor_h
@@ -31,8 +33,10 @@ extern Settings currentSettings;
 class AmbientLightSensor
 {
     static int _threshold, _average, _readingsIndex;
+    static int _minimum_reading, _maximum_reading;
     static int _readings[];
     static unsigned long _lastReadingMillis;
+    static bool _average_is_complete;
   public:
     static void init();
     static void update();
@@ -41,5 +45,7 @@ class AmbientLightSensor
     static void applySettings(Settings *settings);
     static bool isDark();
     static bool isLight();
+    static int minimum_reading();
+    static int maximum_reading();
 };
 #endif

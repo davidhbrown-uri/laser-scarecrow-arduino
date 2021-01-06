@@ -108,7 +108,11 @@ void SettingsObserver::process()
   }
   if (_unsaved && millis() - _lastChangedMillis > SETTINGSOBSERVER_SAVE_AFTER_MS)
   {
+#ifdef DEBUG_SETTINGSOBSERVER
     bool success = SettingsObserver::save(& _settings);
+#else    
+    SettingsObserver::save(& _settings);
+#endif
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
     Serial.print(F("\r\nSettingsObserver saving settings... "));
@@ -230,7 +234,7 @@ uint32_t SettingsObserver::settingsCRC(Settings *settings_ptr)
   byte *memory_ptr = (byte *) settings_ptr;
   CRC32 crc;
   crc.reset();
-  for (int i = 0; i < sizeof(*settings_ptr); i++)
+  for (int i = 0; i < (int) sizeof(*settings_ptr); i++)
   {
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
@@ -260,7 +264,7 @@ bool SettingsObserver::verifyStoredSettings()
   address += 4;
   CRC32 crc;
   crc.reset();
-  for (int i = address; i < address + storedSize; i++)
+  for (int i = address; i < (int) (address + storedSize); i++)
   {
     crc.update(EEPROM.read(i));
   }
