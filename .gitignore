@@ -1,3 +1,5 @@
 
 *.tmp
 *.hex
+LaserScarecrow/.pio/build/project.checksum
+.vscode
