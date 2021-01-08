@@ -182,8 +182,6 @@
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
 #define IR_REFLECTANCE_SEEKING_ROTATION_LIMIT 2
-//how often the RTC should refresh
-#define RTC_REFRESH_MILLIS 2000
 
 
 /***************************

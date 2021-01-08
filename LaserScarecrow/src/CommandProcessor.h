@@ -45,7 +45,6 @@ extern bool stateManual;
 #define CPCODE_ServoTarget 133
 #define CPCODE_TapeSensed 150
 #define CPCODE_TapeSensor 151
-#define CPCODE_RtcControl 201
 #define CPCODE_LightSensorRead 210
 #define CPCODE_LightSensorReadMin 211
 #define CPCODE_LightSensorReadMax 212
@@ -68,8 +67,6 @@ class CommandProcessor
     void setCommand(Command *cd);
     void setStream(Stream *st);
     void setSettings(Settings *stgs);
-// future:    void setConfiguration(Configuration *cf);
-// future:    void setRTC(MockRTC *rtc);
     void process();
     static byte getHoursFromTimeWord(word time);
     static byte getMinutesFromTimeWord(word time);
@@ -82,8 +79,6 @@ class CommandProcessor
     Stream* stream;
     Command* command;
     Settings* settings;
-// future:    Configuration* configuration;
-// future:    MockRTC* rtc;
     bool verbose;
 };// class CommandProcessor
 #endif
