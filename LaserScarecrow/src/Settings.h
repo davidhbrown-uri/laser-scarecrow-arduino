@@ -52,9 +52,6 @@ class Settings {
     int stepper_randomsteps_max; //done but no control implemented
     int stepper_stepsWhileSeeking; //done but no control implemented
     int light_sensor_threshold; //done but no control implemented
-    bool rtc_control; //depends on RTC feature not yet implemented
-    unsigned int rtc_wake; //depends on RTC feature not yet implemented
-    unsigned int rtc_sleep; //depends on RTC feature not yet implemented
     //int stepper_target; // not implemented -- not a setting! Part of current state.
     int interrupt_frequency; // done, including knob control
     int servo_min; // done, including knob control

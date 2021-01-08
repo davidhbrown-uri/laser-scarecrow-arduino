@@ -20,7 +20,6 @@
 #include "Command.h"
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
-#include <Wire.h>
 
 // definitions for finite state machine
 // STATE_CONTINUE can be used to indicate that the current state should be continued
@@ -112,9 +111,6 @@ void setup()
   digitalWrite(LED1_PIN, LED1_INVERT);
   digitalWrite(LED2_PIN, LED2_INVERT);
 
-  // Wire and RTC
-  Wire.begin();
-
   pinMode(BT_PIN_STATE, INPUT);
 
   /*********************
@@ -129,7 +125,6 @@ void setup()
   uProcessor.setCommand(&uCommand);
   uProcessor.setSettings(&currentSettings);
   //future:  uProcessor.setConfiguration(&configuration);
-  //future:  uProcessor.setRTC(&rtc);
   uProcessor.setStream(&COMMAND_PROCESSOR_STREAM_USB);
 #endif
 #ifndef COMMAND_PROCESSOR_ENABLE_USB
@@ -147,7 +142,6 @@ void setup()
   btProcessor.setCommand(&btCommand);
   btProcessor.setSettings(&currentSettings);
   //future:  btProcessor.setConfiguration(&configuration);
-  //future:  btProcessor.setRTC(&rtc);
   btProcessor.setStream(&COMMAND_PROCESSOR_STREAM_BLUETOOTH);
 #ifdef DEBUG_BLUETOOTH
   COMMAND_PROCESSOR_STREAM_BLUETOOTH.println(SOFTWARE_VERSION);

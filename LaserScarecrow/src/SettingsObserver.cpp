@@ -49,26 +49,6 @@ void SettingsObserver::process()
 #endif
   }
 
-  // Check real-time clock
-  if ( _settings.rtc_control != currentSettings.rtc_control ||
-       _settings.rtc_wake != currentSettings.rtc_wake ||
-       _settings.rtc_sleep != currentSettings.rtc_sleep)
-  {
-    //no controller / sensor needs updating for this (yet; probably should)
-    foundChanges = true;
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_SETTINGSOBSERVER
-    Serial.println(F("\r\nSettingsObserver found changes in Real-time Clock settings (mode/wake/sleep)"));
-#endif
-#endif
-  }
-
-
-  //    byte rtc_control; //depends on RTC feature not yet implemented
-  //    word rtc_wake; //depends on RTC feature not yet implemented
-  //    word rtc_sleep; //depends on RTC feature not yet implemented
-  //    int stepper_target; // not implemented
-
 
   // Check Light sensor
   if ( _settings.interrupt_frequency != currentSettings.interrupt_frequency)

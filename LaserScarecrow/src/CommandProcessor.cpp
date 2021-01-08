@@ -228,13 +228,6 @@ void CommandProcessor::process()
           case 1: //verbosity
             verbose = (command->parameterCount > 0 && command->parameter[0] > 0);
             break;
-            /*
-                      case CPCODE_RtcHms:
-                        stream->print(F("System millis = ")); stream->println(millis());
-                        stream->print(F("MockRTC offset = ")); stream->println(rtc.offset);
-                        stream->print(F("MockRTC millisSinceMidnight = ")); stream->println(rtc.getMillisSinceMidnight());
-                        break;
-            */
         }// switch code
         // for any debug code, call it good.
         processOK();
