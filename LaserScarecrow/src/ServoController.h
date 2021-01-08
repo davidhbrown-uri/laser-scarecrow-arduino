@@ -23,11 +23,11 @@ class ServoController
 {
   protected:
     static Servo _servo;
-    static volatile bool _running;
-    static volatile int _pulse;
-    static volatile int _pulseTarget;
-    static volatile int _pulseRangeMin;
-    static volatile int _pulseRangeMax;
+    static bool _running;
+    static int _pulse;
+    static int _pulseTarget;
+    static int _pulseRangeMin;
+    static int _pulseRangeMax;
     static unsigned long _millisBeginHold;
     static unsigned int _holdTimeMillis;
     static unsigned int _runningState;
