@@ -15,11 +15,11 @@
 #define SERVO_RUNNING_STATE_MANUAL 3
 
 Servo ServoController::_servo;
-volatile bool ServoController::_running;
-volatile int ServoController::_pulse;
-volatile int ServoController::_pulseTarget;
-volatile int ServoController::_pulseRangeMin;
-volatile int ServoController::_pulseRangeMax;
+bool ServoController::_running;
+int ServoController::_pulse;
+int ServoController::_pulseTarget;
+int ServoController::_pulseRangeMin;
+int ServoController::_pulseRangeMax;
 unsigned long ServoController::_millisBeginHold;
 unsigned int ServoController::_holdTimeMillis;
 unsigned int ServoController::_runningState;
@@ -75,12 +75,15 @@ void ServoController::update()
   } // if running
 }
 void ServoController::_move() {
-  if (_pulse != _pulseTarget) {
+  if (_pulse != _pulseTarget && (millis()-_millisBeginHold > SERVO_CHANGE_TIME_MS)) {
+    // how far to go?
       int delta = _pulseTarget - _pulse;
-      delta = max(-SERVO_PULSE_DELTA_LIMIT, delta);
-      delta = min(SERVO_PULSE_DELTA_LIMIT, delta);
+    // limit to how far we can go in one step
+      delta = max(-SERVO_PULSE_DELTA, delta);
+      delta = min(SERVO_PULSE_DELTA, delta);
       _pulse += delta;
       _servo.writeMicroseconds(_pulse);
+    _millisBeginHold = millis();
   }
 }
 void ServoController::stop()

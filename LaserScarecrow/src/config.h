@@ -107,24 +107,25 @@
     130 lux => 270
 */
 #define AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD 250
-// Values for the servo that wiggles the laser up and down
-// The angle set will range from LOW to HIGH+WIGGLE
-// A new angle will be set at random every SERVO_HOLD_TIME_MS ms
-#define SERVO_HOLD_TIME_MS 500
-// wiggle was 6
-#define SERVO_ANGLE_WIGGLE 3
-// speed must not be > 255 - SERVO_ANGLE_HIGH or possible byte overflow error
-#define SERVO_ANGLE_SPEED 20
-#define SERVO_ANGLE_DWELL_TIME 2500L
 
 /****************************
  * Hardware Configuration
  */
+//======
+// LASER
+//======
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
 #define LASER_DUTYCYCLERUNTIME 1800000
 #define LASER_DUTYCYCLECOOLDOWN 300000
+//=====
+//SERVO
+//=====
 // Pulse time units are in µs; ranges should be determined for each model of servo used
 // (Angle is too imprecise)
+// SAFETY_MIN/MAX for future software-configurable version
+// USABLE_MIN/MAX are limits in this version of the code
+// SERVO_PULSE_DELTA is the pulse width to change to cause a "just noticeable difference" in the servo position
+// SERVO_CHANGE_TIME_MS is a minimum time to wait between SERVO_PULSE_DELTA changes to avoid stressing the servo
 // 2017: MG90s purchased in 2017: control range apx 700µs to 2300µs
 // 2017: 1ms to 2ms resulted in 90-degree movement
 // 2017: Mounted horn on left because lower values rotate further clockwise.
@@ -132,14 +133,21 @@
 // 2018: Futaba 1307S: control range apx 700µs to 2300µs
 // 2018: Horn mounted on right; minimum angle = flat across top of crop; 
 // 2018:   increasing / maximum angle points down into canopy
-// 2018: Futaba S1307: useful range apx 560µs to 2050µs; movemen
+// 2018: Futaba S1307: useful range apx 560µs to 2050µs; 
 // 2018: Futaba S1307: movement stops (before physical limits) at 550µs, 2400µs
 #define SERVO_PULSE_SAFETY_MIN 550
 #define SERVO_PULSE_SAFETY_MAX 2400
 #define SERVO_PULSE_USABLE_MIN 560
 #define SERVO_PULSE_USABLE_MAX 2050
-#define SERVO_PULSE_DELTA_LIMIT 5
+#define SERVO_PULSE_DELTA 5
+#define SERVO_CHANGE_TIME_MS 3
+// Values for the servo that wiggles the laser up and down
+// A new position will be set at random every SERVO_HOLD_TIME_MS ms
+#define SERVO_HOLD_TIME_MS 500
 
+//=======
+//STEPPER
+//=======
 // based on the stepper motor:
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
 // these adjust the rate of updates
@@ -150,6 +158,9 @@
 // had been 0x1f; changed to 0x02 for belt drive; 0x00 for direct drive?
 #define STEPPER_POSTSCALE_MASK_SEEKING 0x00
 #define STEPPER_MICROSTEPPING_DIVISOR 2
+//===========
+//TAPE SENSOR
+//===========
 // IR Reflectance readings are done during microstepping, so readings * step per read should equal 400 (200 if done at full speed)
 // in testing black tape on white bucket, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
 // 2020-08: now requires 2 bytes RAM for each reading; must be divisor of (STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR)

@@ -332,7 +332,7 @@ void loop()
       //        StepperController::setStepsToStepRandom(
       //          currentSettings.stepper_randomsteps_min,
       //          currentSettings.stepper_randomsteps_max);
-    }
+    } // end /enter behavior
     //update:
     // check for transition events (later checks have priority)
     if (millis() - stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS)
@@ -340,10 +340,14 @@ void loop()
       stateInitReflectanceMillis = millis();
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
-    if (IrReflectanceSensor::isPresent())
+    if (IrReflectanceSensor::isPresent()) 
+    {
       stateCurrent = STATE_SEEKING;
+      }
     if (LaserController::isCoolingDown())
-      stateCurrent = STATE_COOLDOWN;
+      {
+        stateCurrent = STATE_COOLDOWN;
+        }
 
     // do not go dark if BT is connected, issue #37
     if (!bt_connected && AmbientLightSensor::isDark())
@@ -353,6 +357,8 @@ void loop()
     // do our things:
     if (StepperController::getStepsToStep() == 0)
       StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
+        ServoController::update();
+
     if (stateManual)
     {
       stateCurrent = STATE_MANUAL;
@@ -360,7 +366,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
-    }
+    } 
     break;
   /*********************
       SEEKING
@@ -634,7 +640,6 @@ void loop()
 inline void doInterrupt()
 {
   digitalWrite(LED1_PIN, !digitalRead(LED1_PIN));
-  ServoController::update();
   StepperController::update();
 #ifdef LASER_TOGGLE_WITH_INTERRUPT
   LaserController::doInterrupt();
