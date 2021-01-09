@@ -150,14 +150,18 @@
 //=======
 // based on the stepper motor:
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
-// these adjust the rate of updates
-#define SERVO_POSTSCALE_MASK 0x0f
-#define SERVO_POSTSCALE_MASK_SEEKING 0xFF
-// had been 0x3f
-#define STEPPER_POSTSCALE_MASK 0x00
-// had been 0x1f; changed to 0x02 for belt drive; 0x00 for direct drive?
-#define STEPPER_POSTSCALE_MASK_SEEKING 0x00
 #define STEPPER_MICROSTEPPING_DIVISOR 2
+#define STEPPER_TRAVEL_MICROSTEPS_MIN 40
+#define STEPPER_TRAVEL_MICROSTEPS_MAX 400
+#define STEPPER_TRAVEL_REVERSE_PERCENT 30
+#define STEPPER_SPEED_LIMIT_PERCENT_DEFAULT 75
+// max delay is the SLOWEST speed
+#define STEPPER_MICROSEC_STEP_DELAY_MAX 12000
+// min delay is the FASTEST speed
+#define STEPPER_MICROSEC_STEP_DELAY_MIN 2000
+#define STEPPER_MICROSEC_ACCEL_STEP 110
+#define STEPPER_MILLISEC_PAUSE 250
+#define STEPPER_TIMER_MICROSEC_PER_TICK 4
 //===========
 //TAPE SENSOR
 //===========

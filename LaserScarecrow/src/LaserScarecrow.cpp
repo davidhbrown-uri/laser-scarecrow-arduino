@@ -8,7 +8,6 @@
 #include <Arduino.h>
 #include "config.h"
 #include "Settings.h"
-#include "Interrupt.h"
 #include "StepperController.h"
 #include "ServoController.h"
 #include "LaserController.h"
@@ -274,7 +273,6 @@ void loop()
       StepperController::init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
-      Interrupt::init();
     } // finish /enter code
     //update:
     stateCurrent = STATE_INIT_REFLECTANCE;
@@ -300,7 +298,7 @@ void loop()
       LaserController::update(); // because this operation isn't looping
       ServoController::stop();
       StepperController::stop();
-      Interrupt::applySettings(&currentSettings);
+      StepperController::applySettings(&currentSettings);
       //laser is on here
     } //end enter code
     // do/ :
@@ -324,7 +322,7 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering ACTIVE State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      StepperController::applySettings(&currentSettings);
       LaserController::turnOn();
       ServoController::run();
       StepperController::runHalfstep();
@@ -380,7 +378,7 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      StepperController::applySettings(&currentSettings);
       LaserController::turnOff();
       ServoController::stop();
       StepperController::runFullstep();
@@ -432,8 +430,7 @@ void loop()
       LaserController::turnOff();
       ServoController::stop();
       StepperController::stop();
-      // might save a bit of power, but mostly wanting a slow blink rate:
-      Interrupt::setFrequency(1);
+      // TODO: slow blink rate?
     }
     //update:
     if (AmbientLightSensor::isLight())
@@ -466,8 +463,7 @@ void loop()
       ServoController::stop();
       StepperController::runHalfstep();
       StepperController::setStepsToStep(0);
-      // might save a bit of power, but mostly wanting a moderate blink rate:
-      Interrupt::setFrequency(3);
+      // TODO: moderate blink rate:
     }
     //update:
     if (!LaserController::isCoolingDown())
@@ -495,7 +491,7 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering MANUAL State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      StepperController::applySettings(&currentSettings);
       LaserController::turnOff();
       StepperController::runHalfstep();
       StepperController::setStepsToStep(0);
@@ -675,7 +671,7 @@ void checkSpeedKnob()
   knobSpeed.process();
   if (knobSpeed.hasNewValue())
   {
-    currentSettings.interrupt_frequency = map(knobSpeed.getValue(), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+    currentSettings.stepper_speed_limit_percent = map(knobSpeed.getValue(), 0, 1023, 0, 100);
     knobSpeed.acknowledgeNewValue();
     // Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
 #ifdef DEBUG_SERIAL
