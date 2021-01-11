@@ -160,8 +160,12 @@
 // min delay is the FASTEST speed
 #define STEPPER_MICROSEC_STEP_DELAY_MIN 2000
 #define STEPPER_MICROSEC_ACCEL_STEP 110
-#define STEPPER_MILLISEC_PAUSE 250
+// delay this long to change direction without shaking too hard
+#define STEPPER_MILLISEC_DIRECTION_PAUSE 250
 #define STEPPER_TIMER_MICROSEC_PER_TICK 4
+// 1μs required per A4988 datasheet
+// when set to 5, measured almost 7; 2 => 4.5
+#define STEPPER_PULSE_MICROSECONDS 1
 //===========
 //TAPE SENSOR
 //===========
@@ -211,10 +215,8 @@
 //DEPRECATED (use setDisabled() instead): #define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
 // flash or steady
 //#define LASER_TOGGLE_WITH_INTERRUPT
-#define INTERRUPT_FREQUENCY_MIN 20
-#define INTERRUPT_FREQUENCY_MAX 150
 // these thresholds will be raw values when using AnalogInput
-#define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 20
+#define STEPPER_SPEED_KNOB_CHANGE_THRESHOLD 20
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
 //for testing, save settings 30000 ms (30 seconds) after last change; change to 100000 (100 seconds; we're telling them 2 minutes) for release
 //that long a delay was obnoxious. Changed to 15 seconds.

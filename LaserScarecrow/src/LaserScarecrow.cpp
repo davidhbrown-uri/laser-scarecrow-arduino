@@ -7,8 +7,8 @@
 */
 #include <Arduino.h>
 #include "config.h"
-#include "Settings.h"
 #include "StepperController.h"
+#include "Settings.h"
 #include "ServoController.h"
 #include "LaserController.h"
 #include "AmbientLightSensor.h"
@@ -100,7 +100,7 @@ void setup()
   }
 
   // Knobs
-  knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
+  knobSpeed.begin(KNOB1_PIN, 5, 50, STEPPER_SPEED_KNOB_CHANGE_THRESHOLD);
   knobAngleMin.begin(KNOB2_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
   knobAngleRange.begin(KNOB3_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
 
@@ -220,7 +220,6 @@ void loop()
   case STATE_POWERON:
     currentSettings.init();
     StepperController::init();
-    StepperController::stop();
 // Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
     if (serialCanWrite)
@@ -297,7 +296,7 @@ void loop()
       LaserController::turnOff();
       LaserController::update(); // because this operation isn't looping
       ServoController::stop();
-      StepperController::stop();
+      StepperController::move_stop();
       StepperController::applySettings(&currentSettings);
       //laser is on here
     } //end enter code
@@ -325,11 +324,6 @@ void loop()
       StepperController::applySettings(&currentSettings);
       LaserController::turnOn();
       ServoController::run();
-      StepperController::runHalfstep();
-      // don't do this on entry, as it's might have been set by STATE_SEEKING; only do it if stepsToStep==0, below
-      //        StepperController::setStepsToStepRandom(
-      //          currentSettings.stepper_randomsteps_min,
-      //          currentSettings.stepper_randomsteps_max);
     } // end /enter behavior
     //update:
     // check for transition events (later checks have priority)
@@ -338,14 +332,14 @@ void loop()
       stateInitReflectanceMillis = millis();
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
-    if (IrReflectanceSensor::isPresent()) 
+    if (IrReflectanceSensor::isPresent())
     {
       stateCurrent = STATE_SEEKING;
-      }
+    }
     if (LaserController::isCoolingDown())
-      {
-        stateCurrent = STATE_COOLDOWN;
-        }
+    {
+      stateCurrent = STATE_COOLDOWN;
+    }
 
     // do not go dark if BT is connected, issue #37
     if (!bt_connected && AmbientLightSensor::isDark())
@@ -353,9 +347,11 @@ void loop()
       stateCurrent = STATE_DARK;
     }
     // do our things:
-    if (StepperController::getStepsToStep() == 0)
-      StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
-        ServoController::update();
+    if (StepperController::is_stopped())
+      StepperController::move(
+          random(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max) *
+          (random(0, 100) < STEPPER_TRAVEL_REVERSE_PERCENT ? -1 : 1));
+    ServoController::update();
 
     if (stateManual)
     {
@@ -364,13 +360,12 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
-    } 
+    }
     break;
   /*********************
       SEEKING
     *********************/
   case STATE_SEEKING:
-    bool seeking_backwards;
     if (stateCurrent != statePrevious)
     { // onEntry
       statePrevious = stateCurrent;
@@ -381,10 +376,8 @@ void loop()
       StepperController::applySettings(&currentSettings);
       LaserController::turnOff();
       ServoController::stop();
-      StepperController::runFullstep();
-      seeking_backwards = StepperController::getStepsToStep() < 0;
-      seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
+      seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / currentSettings.stepper_stepsWhileSeeking;
+      StepperController::move_extend(currentSettings.stepper_stepsWhileSeeking);
     }
     //update:
     //check for transition
@@ -394,12 +387,12 @@ void loop()
       // force some additional movement to avoid lots of chattering at trailing edge of tape
       // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
       // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * (random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max)));
+      StepperController::move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
     }
     //do our things:
-    if (StepperController::getStepsToStep() == 0)
+    if (StepperController::is_stopped())
     {
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
+      StepperController::move_extend(currentSettings.stepper_stepsWhileSeeking);
       seekingRotationLimitCountdown--;
     }
     if (seekingRotationLimitCountdown == 0)
@@ -429,7 +422,7 @@ void loop()
 #endif // DEBUG_SERIAL
       LaserController::turnOff();
       ServoController::stop();
-      StepperController::stop();
+      StepperController::turn_off();
       // TODO: slow blink rate?
     }
     //update:
@@ -461,8 +454,7 @@ void loop()
       LaserController::turnOff(); // it may already have done this itself.
       //servo detach
       ServoController::stop();
-      StepperController::runHalfstep();
-      StepperController::setStepsToStep(0);
+      StepperController::turn_off();
       // TODO: moderate blink rate:
     }
     //update:
@@ -493,8 +485,7 @@ void loop()
 #endif // DEBUG_SERIAL
       StepperController::applySettings(&currentSettings);
       LaserController::turnOff();
-      StepperController::runHalfstep();
-      StepperController::setStepsToStep(0);
+      StepperController::move_stop();
       ServoController::runManually();
       manualLaserPulseMillis = millis();
     } // enter code
@@ -636,34 +627,19 @@ void loop()
 inline void doInterrupt()
 {
   digitalWrite(LED1_PIN, !digitalRead(LED1_PIN));
-  StepperController::update();
+  StepperController::isr();
 #ifdef LASER_TOGGLE_WITH_INTERRUPT
   LaserController::doInterrupt();
 #endif
 }
-#ifdef INTERRUPTS_ATmega328P_T2
-#define INTERRUPT_VECT TIMER2_COMPA_vect
-ISR(TIMER2_COMPA_vect)
-{
-  doInterrupt();
-}
-#endif
-#ifdef INTERRUPTS_ATmega32U4_T1
-ISR(TIMER1_COMPA_vect)
-{
-  doInterrupt();
-}
-#endif
-#ifdef INTERRUPTS_ATmega32U4_T3
 ISR(TIMER3_COMPA_vect)
 {
   doInterrupt();
 }
-#endif
 
 /*****************
    Helper functions
-   Put things here that require access to multuple modules
+   Put things here that require access to multiple modules
 */
 
 void checkSpeedKnob()

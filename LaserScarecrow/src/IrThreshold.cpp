@@ -72,13 +72,16 @@ void IrThreshold::scanReflectance()
     Serial.println(F("\r\nScanning for reflectance (scaled 0x0-0xF):"));
 #endif
 #endif
-  StepperController::setStepsToStep(0);
-  StepperController::runHalfstep();
+  StepperController::move_stop();
+  while (!StepperController::is_stopped())
+  {
+    ;
+  }
   for (int i = 0; i < IR_REFLECTANCE_READINGS; i++)
   {
     // move backwards to make this behavior easier to see/understand
-    StepperController::setStepsToStep(-IR_REFLECTANCE_STEPS_PER_READ);
-    while (StepperController::getStepsToStep() != 0)
+    StepperController::move(-IR_REFLECTANCE_STEPS_PER_READ);
+    while (!StepperController::is_stopped())
     {
       ;
     }
