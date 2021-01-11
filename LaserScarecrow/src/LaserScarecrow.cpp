@@ -71,6 +71,7 @@ bool bt_connected = false;
 
 */
 Settings currentSettings;
+StepperController stepper_controller;
 Command uCommand, btCommand;
 CommandProcessor uProcessor, btProcessor;
 
@@ -219,7 +220,7 @@ void loop()
     *********************/
   case STATE_POWERON:
     currentSettings.init();
-    StepperController::init();
+    stepper_controller.init();
 // Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
     if (serialCanWrite)
@@ -269,7 +270,7 @@ void loop()
       }
       LaserController::init();
       ServoController::init();
-      StepperController::init();
+      stepper_controller.init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
     } // finish /enter code
@@ -296,8 +297,8 @@ void loop()
       LaserController::turnOff();
       LaserController::update(); // because this operation isn't looping
       ServoController::stop();
-      StepperController::move_stop();
-      StepperController::applySettings(&currentSettings);
+      stepper_controller.move_stop();
+      stepper_controller.applySettings(&currentSettings);
       //laser is on here
     } //end enter code
     // do/ :
@@ -321,7 +322,7 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering ACTIVE State]]"));
 #endif // DEBUG_SERIAL
-      StepperController::applySettings(&currentSettings);
+      stepper_controller.applySettings(&currentSettings);
       LaserController::turnOn();
       ServoController::run();
     } // end /enter behavior
@@ -347,8 +348,8 @@ void loop()
       stateCurrent = STATE_DARK;
     }
     // do our things:
-    if (StepperController::is_stopped())
-      StepperController::move(
+    if (stepper_controller.is_stopped())
+      stepper_controller.move(
           random(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max) *
           (random(0, 100) < STEPPER_TRAVEL_REVERSE_PERCENT ? -1 : 1));
     ServoController::update();
@@ -373,11 +374,11 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
-      StepperController::applySettings(&currentSettings);
+      stepper_controller.applySettings(&currentSettings);
       LaserController::turnOff();
       ServoController::stop();
       seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / currentSettings.stepper_stepsWhileSeeking;
-      StepperController::move_extend(currentSettings.stepper_stepsWhileSeeking);
+      stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
     }
     //update:
     //check for transition
@@ -387,12 +388,12 @@ void loop()
       // force some additional movement to avoid lots of chattering at trailing edge of tape
       // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
       // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
-      StepperController::move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
+      stepper_controller.move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
     }
     //do our things:
-    if (StepperController::is_stopped())
+    if (stepper_controller.is_stopped())
     {
-      StepperController::move_extend(currentSettings.stepper_stepsWhileSeeking);
+      stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
       seekingRotationLimitCountdown--;
     }
     if (seekingRotationLimitCountdown == 0)
@@ -422,7 +423,7 @@ void loop()
 #endif // DEBUG_SERIAL
       LaserController::turnOff();
       ServoController::stop();
-      StepperController::turn_off();
+      stepper_controller.turn_off();
       // TODO: slow blink rate?
     }
     //update:
@@ -454,7 +455,7 @@ void loop()
       LaserController::turnOff(); // it may already have done this itself.
       //servo detach
       ServoController::stop();
-      StepperController::turn_off();
+      stepper_controller.turn_off();
       // TODO: moderate blink rate:
     }
     //update:
@@ -483,9 +484,9 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering MANUAL State]]"));
 #endif // DEBUG_SERIAL
-      StepperController::applySettings(&currentSettings);
+      stepper_controller.applySettings(&currentSettings);
       LaserController::turnOff();
-      StepperController::move_stop();
+      stepper_controller.move_stop();
       ServoController::runManually();
       manualLaserPulseMillis = millis();
     } // enter code
@@ -588,8 +589,8 @@ void loop()
     Serial.print(AmbientLightSensor::isLight() ? F(" (Light)") : F(" (Dark)"));
 #endif
 #ifdef DEBUG_STEPPER
-    Serial.print("\r\nStepperController::getStepsToStep = ");
-    Serial.print(StepperController::getStepsToStep());
+    Serial.print("\r\nstepper_controller.getStepsToStep = ");
+    Serial.print(stepper_controller.getStepsToStep());
 #endif
 #ifdef DEBUG_SERVO
     Serial.print(F("\r\nServoController::pulse="));
@@ -624,17 +625,13 @@ void loop()
    INTERRUPT HANDLERS
 */
 
-inline void doInterrupt()
+ISR(TIMER3_COMPA_vect)
 {
   digitalWrite(LED1_PIN, !digitalRead(LED1_PIN));
-  StepperController::isr();
+  StepperController::isr(& stepper_controller);
 #ifdef LASER_TOGGLE_WITH_INTERRUPT
   LaserController::doInterrupt();
 #endif
-}
-ISR(TIMER3_COMPA_vect)
-{
-  doInterrupt();
 }
 
 /*****************

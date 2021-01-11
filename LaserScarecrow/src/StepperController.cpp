@@ -233,29 +233,29 @@ void StepperController::_buildTable()
   }
 }
 
-inline void StepperController::isr()
+void StepperController::isr(StepperController *stepper_contoller)
 {
-  if (_isr_steps_remaining > 0)
+  if (stepper_contoller->_isr_steps_remaining > 0)
   {
     digitalWrite(STEPPER_PIN_STEP, HIGH);
     delayMicroseconds(STEPPER_PULSE_MICROSECONDS);
     digitalWrite(STEPPER_PIN_STEP, LOW);
-    _isr_steps_taken++;
-    _isr_steps_remaining--;
+    stepper_contoller->_isr_steps_taken++;
+    stepper_contoller->_isr_steps_remaining--;
     // accelerate if before midpoint
-    if (_isr_steps_taken < _isr_steps_remaining &&
-        _isr_top_accel_table_current_index < _isr_top_accel_table_max_index)
+    if (stepper_contoller->_isr_steps_taken < stepper_contoller->_isr_steps_remaining &&
+        stepper_contoller->_isr_top_accel_table_current_index < stepper_contoller->_isr_top_accel_table_max_index)
     {
-      _isr_top_accel_table_current_index++;
+      stepper_contoller->_isr_top_accel_table_current_index++;
     }
     // decelerate if isr_steps_remaining < timer_top_accel_table_current_index and isr_steps_taken > timer_steps_midpoint
     else if (
-        _isr_steps_remaining < _isr_top_accel_table_current_index && _isr_steps_taken > _isr_steps_remaining && _isr_top_accel_table_current_index > 0)
+        stepper_contoller->_isr_steps_remaining < stepper_contoller->_isr_top_accel_table_current_index && stepper_contoller->_isr_steps_taken > stepper_contoller->_isr_steps_remaining && stepper_contoller->_isr_top_accel_table_current_index > 0)
     {
-      _isr_top_accel_table_current_index--;
+      stepper_contoller->_isr_top_accel_table_current_index--;
     }
 
     // OCR3A = compare match register A is TOP; set to prescale = 64, so 4μs per tick on 16MHz clock
-    OCR3A = _isr_top_accel_table[_isr_top_accel_table_current_index];
+    OCR3A = stepper_contoller->_isr_top_accel_table[stepper_contoller->_isr_top_accel_table_current_index];
   } // if stepping
 }

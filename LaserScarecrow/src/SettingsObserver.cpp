@@ -9,6 +9,8 @@
 /** @see SettingsObserver.h */
 #include "SettingsObserver.h"
 #include <EEPROM.h>
+#include "StepperController.h"
+extern StepperController stepper_controller;
 
 Settings SettingsObserver::_settings;
 bool SettingsObserver::_unsaved = false;
@@ -37,7 +39,7 @@ void SettingsObserver::process()
   // Check Light sensor
   if ( _settings.stepper_speed_limit_percent != currentSettings.stepper_speed_limit_percent)
   {
-    StepperController::applySettings(&currentSettings);
+    stepper_controller.applySettings(&currentSettings);
     foundChanges = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
