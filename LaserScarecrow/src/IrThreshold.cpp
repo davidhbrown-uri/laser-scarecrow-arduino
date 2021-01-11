@@ -77,7 +77,7 @@ void IrThreshold::scanReflectance()
   stepper_controller.move_stop();
   while (!stepper_controller.is_stopped())
   {
-    ;
+    stepper_controller.update();
   }
   for (int i = 0; i < IR_REFLECTANCE_READINGS; i++)
   {
@@ -85,7 +85,7 @@ void IrThreshold::scanReflectance()
     stepper_controller.move(-IR_REFLECTANCE_STEPS_PER_READ);
     while (!stepper_controller.is_stopped())
     {
-      ;
+      stepper_controller.update();
     }
     reflectance_readings[i] = IrReflectanceSensor::readAverage(IR_REFLECTANCE_SCANNING_AVERAGING);
 #ifdef DEBUG_SERIAL
@@ -362,13 +362,13 @@ void IrThreshold::setReflectanceThreshold()
     findShortestAbsentSpan();
     findLongestPresentSpan();
     // when the laser is active, step randomly from...
-    currentSettings.stepper_randomsteps_max = ((int)span_shortest_absent) * 2 / 3;              // two thirds the smallest no-tape span forwards
-    currentSettings.stepper_randomsteps_min = currentSettings.stepper_randomsteps_max * -5 / 7; // 70% of that backwards
+    currentSettings.stepper_randomsteps_max = max(STEPPER_TRAVEL_MICROSTEPS_MAX, ((int)span_shortest_absent) * 2 / 3); // two thirds the smallest no-tape span forwards
+    currentSettings.stepper_randomsteps_min = max(STEPPER_TRAVEL_MICROSTEPS_MIN, (int)span_shortest_absent / 5);
     // when seeking / skipping tape...
     currentSettings.stepper_stepsWhileSeeking = max(
-                                                    STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 8, // step at least 1/8 rotation
-                                                    ((int)span_longest_present) * 2 / 3)                                // or up to 2/3 the longest detected span of tape
-                                                / STEPPER_MICROSTEPPING_DIVISOR;                                        // seeking is done with whole steps
+        STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 8, // step at least 1/8 rotation
+        ((int)span_longest_present * 11 / 10))                              // 110% of the longest detected span of tape
+        ;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE_THRESHOLD
     if (serialCanWrite)

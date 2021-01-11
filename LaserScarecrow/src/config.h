@@ -7,11 +7,13 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.6.2 - August 2020 release for 2020 kits")
+#define SOFTWARE_VERSION F("Version 2.8.0 - January 2021 release for 2020 kits")
 
 /*******************
    VERSION HISTORY
  *******************
+  2.8.0 - 2021-01-11: Implement better use of timer for acceleration/deceleration of stepper
+
   2.6.2 - 2020-08-21: Can now skip forward or backward over tape; pretty much eliminates chatter/grinding previously experienced when backing into tape
   
   2.6.1 - 2020-08-20: Light threshold: store / access min and max since power-on; fix rolling average in first n readings.
@@ -91,11 +93,7 @@
  * Default behavior configuration
  */
 
-// overall speed:
-#define INTERRUPT_FREQUENCY_DEFAULT 200
-#define STEPPER_RANDOMSTEPS_MIN -50
-#define STEPPER_RANDOMSTEPS_MAX 80
-#define STEPPER_STEPS_WHILE_SEEKING 17
+
 /* Ambient lux levels measured by ColorMunki -> threshold values
     Per https://en.wikipedia.org/wiki/Lux dark limit of twilight is 3.4 lux
      3 lux => 28~30  // office during thunderstorm 3pm
@@ -151,17 +149,17 @@
 // based on the stepper motor:
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
 #define STEPPER_MICROSTEPPING_DIVISOR 2
-#define STEPPER_TRAVEL_MICROSTEPS_MIN 40
-#define STEPPER_TRAVEL_MICROSTEPS_MAX 400
+#define STEPPER_TRAVEL_MICROSTEPS_MIN 20
+#define STEPPER_TRAVEL_MICROSTEPS_MAX 150
 #define STEPPER_TRAVEL_REVERSE_PERCENT 30
 #define STEPPER_SPEED_LIMIT_PERCENT_DEFAULT 75
 // max delay is the SLOWEST speed
 #define STEPPER_MICROSEC_STEP_DELAY_MAX 12000
 // min delay is the FASTEST speed
-#define STEPPER_MICROSEC_STEP_DELAY_MIN 2000
-#define STEPPER_MICROSEC_ACCEL_STEP 110
+#define STEPPER_MICROSEC_STEP_DELAY_MIN 1800
+#define STEPPER_MICROSEC_ACCEL_STEP 130
 // delay this long to change direction without shaking too hard
-#define STEPPER_MILLISEC_DIRECTION_PAUSE 250
+#define STEPPER_MILLISEC_DIRECTION_PAUSE 50
 #define STEPPER_TIMER_MICROSEC_PER_TICK 4
 // 1μs required per A4988 datasheet
 // when set to 5, measured almost 7; 2 => 4.5
@@ -305,12 +303,11 @@
 //#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_THRESHOLD
-//#define DEBUG_SETTINGS
+#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
 
-//#define DEBUG_STEPPER
-//#define DEBUG_STEPPER_STEPS
+#define DEBUG_STEPPER_CONTROLLER
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY

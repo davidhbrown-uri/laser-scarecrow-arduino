@@ -93,10 +93,10 @@ bool SettingsObserver::save(Settings *settings_ptr)
   int address = 0;
   uint32_t checksum = settingsCRC(settings_ptr);
   //write type id, "LS20"
-  EEPROM.update(address++, 76); // "L"
-  EEPROM.update(address++, 83); // "S"
-  EEPROM.update(address++, 49); // "2"
-  EEPROM.update(address++, 56); // "0"
+  EEPROM.update(address++, 'L'); // "L"
+  EEPROM.update(address++, 'S'); // "S"
+  EEPROM.update(address++, '2'); // "2"
+  EEPROM.update(address++, '0'); // "0"
   uint16_t settingsSize = sizeof(*settings_ptr);
   EEPROM.put(address, settingsSize);
   address += 2;
@@ -118,11 +118,11 @@ bool SettingsObserver::checkHeader(Settings *settings_ptr)
 {
   bool success = true;
   int address = 0;
-  // file type id, "LS18"
-  success &= EEPROM.read(address++) == 76; // "L"
-  success &= EEPROM.read(address++) == 83; // "S"
-  success &= EEPROM.read(address++) == 49; // "2"
-  success &= EEPROM.read(address++) == 56; // "0"
+  // file type id, "LS20"
+  success &= EEPROM.read(address++) == 'L'; // "L"
+  success &= EEPROM.read(address++) == 'S'; // "X"
+  success &= EEPROM.read(address++) == '2'; // "2"
+  success &= EEPROM.read(address++) == '0'; // "0"
   uint16_t settingsSize = 0;
   EEPROM.get(address, settingsSize);
   success &= settingsSize == sizeof(*settings_ptr);

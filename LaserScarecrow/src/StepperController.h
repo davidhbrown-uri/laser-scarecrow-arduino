@@ -68,5 +68,6 @@ public:
   int getSpeedLimitPercent();
   void applySettings(Settings *settings);
   bool is_stopped();
+  unsigned long get_steps_taken_this_move();
   static void isr(StepperController *stepper_contoller);
 };

@@ -16,6 +16,7 @@
 
 #define STEPPER_CONTROLLER_EVENT_NONE 0
 #define STEPPER_CONTROLLER_EVENT_MOVE 1
+#define STEPPER_CONTROLLER_EVENT_EXTEND 11
 #define STEPPER_CONTROLLER_EVENT_TURN_OFF 2
 
 void StepperController::init()
@@ -63,6 +64,10 @@ void StepperController::update()
     {
       _state = STEPPER_CONTROLLER_STATE_RUNNING;
     } // do/ event move
+    if (_event == STEPPER_CONTROLLER_EVENT_EXTEND)
+    {
+      _state = STEPPER_CONTROLLER_STATE_RUNNING;
+    } // do/ event extend
     // exit
     if (_state != _statePrevious)
     {
@@ -81,6 +86,12 @@ void StepperController::update()
     switch (_event)
     {
     case STEPPER_CONTROLLER_EVENT_MOVE:
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_STEPPER_CONTROLLER
+      Serial.print(F("StepperController moving by "));
+      Serial.println(_stepsRequested);
+#endif
+#endif
       if (_direction != (_stepsRequested >= 0)) // need to change direction
       {
         if (_isr_steps_remaining == 0) // have to finish previous move
@@ -93,16 +104,28 @@ void StepperController::update()
       }    // do direction change
       else // we can do the move
       {
-        _isr_steps_remaining += abs(_stepsRequested);
-        _stepsRequested = 0; // clear so we can tell if we've stopped
-        _event = STEPPER_CONTROLLER_EVENT_NONE;
-      } // end else
+        _isr_steps_remaining = (unsigned long)(abs(_stepsRequested));
+        _isr_steps_taken = 0;
+        _stepsRequested = 0;                    // clear so we can tell if we've stopped
+        _event = STEPPER_CONTROLLER_EVENT_NONE; // have handled this event
+      }                                         // end else
+      break;
+    case STEPPER_CONTROLLER_EVENT_EXTEND:
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_STEPPER_CONTROLLER
+      Serial.print(F("StepperController extending by "));
+      Serial.println(_stepsRequested);
+#endif
+#endif
+      _isr_steps_remaining = _isr_steps_remaining + (unsigned long)_stepsRequested;
+      _stepsRequested = 0;
+      _event = STEPPER_CONTROLLER_EVENT_NONE; // have handled this event
       break;
     case STEPPER_CONTROLLER_EVENT_TURN_OFF:
-      if (_isr_steps_remaining == 0)
+      if (_isr_steps_remaining == 0) // wait to finish move
       {
         _state = STEPPER_CONTROLLER_STATE_OFF;
-        _event = STEPPER_CONTROLLER_EVENT_NONE;
+        _event = STEPPER_CONTROLLER_EVENT_NONE; // have handled this event
       }
       break;
     case STEPPER_CONTROLLER_EVENT_NONE:; // nothing to process
@@ -163,14 +186,21 @@ void StepperController::move(int steps)
 
 void StepperController::move_extend(int steps)
 {
-  _stepsRequested = abs(steps) * (_direction ? 1 : -1);
-  _event = STEPPER_CONTROLLER_EVENT_MOVE;
+  _stepsRequested = abs(steps);
+  _event = STEPPER_CONTROLLER_EVENT_EXTEND;
+}
+
+unsigned long StepperController::get_steps_taken_this_move()
+{
+  return _isr_steps_taken;
 }
 
 void StepperController::setSpeedLimitPercent(int percent)
 {
-  _isr_top_accel_table_max_index = min(_isr_top_accel_table_length - 1, max(0,
-                                                                            map(percent, 0, 100, 0, _isr_top_accel_table_length - 1)));
+  uint16_t percent_index = abs(percent);
+  percent_index = map(percent, 0, 100, 0, _isr_top_accel_table_length - 1);
+  percent_index = max(0, percent_index);
+  _isr_top_accel_table_max_index = min(_isr_top_accel_table_length - 1, percent_index);
 }
 
 int StepperController::getSpeedLimitPercent()
@@ -216,20 +246,28 @@ void StepperController::_initTimer()
 void StepperController::_buildTable()
 {
   float f_delay_range = (float)STEPPER_MICROSEC_STEP_DELAY_MAX - (float)STEPPER_MICROSEC_STEP_DELAY_MIN;
-  for (unsigned int i = 0; i < StepperController::_isr_top_accel_table_length; i++)
+  for (unsigned int i = 0; i < _isr_top_accel_table_length; i++)
   {
-    float p = (float)(i + 1) / (float)StepperController::_isr_top_accel_table_length; // how far are we through the range 0.0-1.0?
-    if (p < 0.5)                                                                      // ease-in quadratic, then linear halfway through
+    float p = (float)(i + 1) / (float)_isr_top_accel_table_length; // how far are we through the range 0.0-1.0?
+    if (p < 0.5)                                                   // ease-in quadratic, then linear halfway through
     {
       p = p * p * 2.0;
     }
-    StepperController::_isr_top_accel_table[i] = (STEPPER_MICROSEC_STEP_DELAY_MAX - (int)(p * p * f_delay_range)) / STEPPER_TIMER_MICROSEC_PER_TICK;
+    _isr_top_accel_table[i] = (STEPPER_MICROSEC_STEP_DELAY_MAX - (int)(p * f_delay_range)) / STEPPER_TIMER_MICROSEC_PER_TICK;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_STEPPER_CONTROLLER
+    Serial.print(F("Stepper speed "));
+    Serial.print(i);
+    Serial.print(F(" => "));
+    Serial.println(_isr_top_accel_table[i]);
+#endif
+#endif
   }
   // timer_top_accel_table_max_index should be read from a setting; must be < timer_top_accel_table_length
-  StepperController::_isr_top_accel_table_max_index = StepperController::_isr_top_accel_table_length - 1;
-  if (StepperController::_isr_top_accel_table_max_index >= StepperController::_isr_top_accel_table_length)
+  _isr_top_accel_table_max_index = _isr_top_accel_table_length - 1;
+  if (_isr_top_accel_table_max_index >= _isr_top_accel_table_length)
   {
-    StepperController::_isr_top_accel_table_max_index = StepperController::_isr_top_accel_table_length - 1;
+    _isr_top_accel_table_max_index = _isr_top_accel_table_length - 1;
   }
 }
 
@@ -243,9 +281,10 @@ void StepperController::isr(StepperController *stepper_contoller)
     stepper_contoller->_isr_steps_taken++;
     stepper_contoller->_isr_steps_remaining--;
     // accelerate if before midpoint
-    if (stepper_contoller->_isr_steps_taken < stepper_contoller->_isr_steps_remaining &&
+    if ((stepper_contoller->_isr_steps_remaining > stepper_contoller->_isr_top_accel_table_current_index) &&
         stepper_contoller->_isr_top_accel_table_current_index < stepper_contoller->_isr_top_accel_table_max_index)
     {
+      digitalWrite(LED1_PIN, HIGH);
       stepper_contoller->_isr_top_accel_table_current_index++;
     }
     // decelerate if isr_steps_remaining < timer_top_accel_table_current_index and isr_steps_taken > timer_steps_midpoint
@@ -253,6 +292,7 @@ void StepperController::isr(StepperController *stepper_contoller)
         stepper_contoller->_isr_steps_remaining < stepper_contoller->_isr_top_accel_table_current_index && stepper_contoller->_isr_steps_taken > stepper_contoller->_isr_steps_remaining && stepper_contoller->_isr_top_accel_table_current_index > 0)
     {
       stepper_contoller->_isr_top_accel_table_current_index--;
+      digitalWrite(LED1_PIN, LOW);
     }
 
     // OCR3A = compare match register A is TOP; set to prescale = 64, so 4μs per tick on 16MHz clock

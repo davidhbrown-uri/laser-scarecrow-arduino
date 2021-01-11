@@ -52,7 +52,7 @@ unsigned long stateInitReflectanceMillis;
 unsigned long loopLedLastChangeMillis = 0L;
 unsigned long loopProcessLastMillis = 0L;
 unsigned long loopLastSerial = 0L;
-int seekingRotationLimitCountdown;
+unsigned long seekingMicrostepsLimit = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR;
 
 #ifdef DEBUG_AIMCONTROLLER
 #ifdef DEBUG_SERIAL
@@ -273,6 +273,17 @@ void loop()
       stepper_controller.init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
+      int original_speed = stepper_controller.getSpeedLimitPercent();
+      stepper_controller.setSpeedLimitPercent(100);
+      for (int i = 1; i < 4; i++)
+      {
+        stepper_controller.move(i * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 2);
+        while (!stepper_controller.is_stopped())
+        {
+          stepper_controller.update();
+        }
+      }
+      stepper_controller.setSpeedLimitPercent(original_speed);
     } // finish /enter code
     //update:
     stateCurrent = STATE_INIT_REFLECTANCE;
@@ -349,9 +360,11 @@ void loop()
     }
     // do our things:
     if (stepper_controller.is_stopped())
+    {
       stepper_controller.move(
           random(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max) *
           (random(0, 100) < STEPPER_TRAVEL_REVERSE_PERCENT ? -1 : 1));
+    }
     ServoController::update();
 
     if (stateManual)
@@ -377,10 +390,12 @@ void loop()
       stepper_controller.applySettings(&currentSettings);
       LaserController::turnOff();
       ServoController::stop();
-      seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / currentSettings.stepper_stepsWhileSeeking;
-      stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
+      if (!stepper_controller.is_stopped())
+      {
+        stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
+      }
     }
-    //update:
+    //do/
     //check for transition
     if (!IrReflectanceSensor::isPresent())
     {
@@ -388,15 +403,14 @@ void loop()
       // force some additional movement to avoid lots of chattering at trailing edge of tape
       // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
       // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
-      stepper_controller.move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
+      //      stepper_controller.move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
     }
     //do our things:
     if (stepper_controller.is_stopped())
     {
       stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
-      seekingRotationLimitCountdown--;
     }
-    if (seekingRotationLimitCountdown == 0)
+    if (stepper_controller.get_steps_taken_this_move() > seekingMicrostepsLimit)
     {
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
@@ -544,6 +558,7 @@ void loop()
   // timing-imprecise tasks:
   LaserController::update();
   AmbientLightSensor::update();
+  stepper_controller.update();
   digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
 
   ////////// DEBUG OUTPUT:
@@ -553,10 +568,10 @@ void loop()
   loopCount++;
 #endif
   long loopsTotalDuration = millis() - loopLastSerial;
-  loopLastSerial = millis();
   bool outputSerialDebug = (loopsTotalDuration > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug && Serial)
   {
+    loopLastSerial = millis();
     Serial.println();
 #ifdef DEBUG_LOOP_TIME
     Serial.print(F("Average loop duration (ms): "));
@@ -588,9 +603,16 @@ void loop()
     Serial.print(AmbientLightSensor::read());
     Serial.print(AmbientLightSensor::isLight() ? F(" (Light)") : F(" (Dark)"));
 #endif
-#ifdef DEBUG_STEPPER
-    Serial.print("\r\nstepper_controller.getStepsToStep = ");
-    Serial.print(stepper_controller.getStepsToStep());
+#ifdef DEBUG_STEPPER_CONTROLLER
+    if (stepper_controller.is_stopped())
+    {
+      Serial.println(F("StepperController is stopped"));
+    }
+    else
+    {
+      Serial.print(F("StepperController steps this move = "));
+      Serial.println(stepper_controller.get_steps_taken_this_move());
+    }
 #endif
 #ifdef DEBUG_SERVO
     Serial.print(F("\r\nServoController::pulse="));
@@ -627,8 +649,7 @@ void loop()
 
 ISR(TIMER3_COMPA_vect)
 {
-  digitalWrite(LED1_PIN, !digitalRead(LED1_PIN));
-  StepperController::isr(& stepper_controller);
+  StepperController::isr(&stepper_controller);
 #ifdef LASER_TOGGLE_WITH_INTERRUPT
   LaserController::doInterrupt();
 #endif
