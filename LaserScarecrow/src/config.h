@@ -113,8 +113,11 @@
 // LASER
 //======
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
-#define LASER_DUTYCYCLERUNTIME 1800000
-#define LASER_DUTYCYCLECOOLDOWN 300000
+//#define LASER_DUTYCYCLERUNTIME 1800000
+//#define LASER_DUTYCYCLECOOLDOWN 300000
+// for testing: 10sec duty; 30sec cooldown
+#define LASER_DUTYCYCLERUNTIME 10000
+#define LASER_DUTYCYCLECOOLDOWN 30000
 //=====
 //SERVO
 //=====
@@ -300,7 +303,7 @@
 // serial debug data rate will use COMMAND_PROCESSOR_DATARATE_USB
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
 // increase somewhat while debugging to make serial connection easier; 3 for production
-#define DEBUG_SERIAL_COUNTDOWN_SECONDS 3
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 5
 //#define DEBUG_LOOP_TIME
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
@@ -311,7 +314,7 @@
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
 
-#define DEBUG_STEPPER_CONTROLLER
+//#define DEBUG_STEPPER_CONTROLLER
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY

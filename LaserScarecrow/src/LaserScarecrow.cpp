@@ -19,6 +19,7 @@
 #include "Command.h"
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
+#include "Led.h"
 
 // definitions for finite state machine
 // STATE_CONTINUE can be used to indicate that the current state should be continued
@@ -78,6 +79,8 @@ CommandProcessor uProcessor, btProcessor;
 
 AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
 
+Led led1(LED1_PIN, LED1_INVERT), led2(LED2_PIN, LED2_INVERT);
+
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_LOOP_TIME
 unsigned long loopCount = 0L;
@@ -105,12 +108,6 @@ void setup()
   knobSpeed.begin(KNOB1_PIN, 5, 50, STEPPER_SPEED_KNOB_CHANGE_THRESHOLD);
   knobAngleMin.begin(KNOB2_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
   knobAngleRange.begin(KNOB3_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
-
-  // pending LedController
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-  digitalWrite(LED1_PIN, LED1_INVERT);
-  digitalWrite(LED2_PIN, LED2_INVERT);
 
   pinMode(BT_PIN_STATE, INPUT);
 
@@ -222,6 +219,8 @@ void loop()
   case STATE_POWERON:
     currentSettings.init();
     stepper_controller.init();
+    led1.on();
+    led2.on();
 // Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
     if (serialCanWrite)
@@ -249,6 +248,8 @@ void loop()
     {
       statePrevious = stateCurrent;
       // onEnter code:
+      led1.off();
+      led2.off();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering INIT State]]"));
@@ -281,6 +282,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      do_pre_laser_rotation();
     }
     break;
 
@@ -292,6 +294,8 @@ void loop()
     {
       statePrevious = stateCurrent;
       //enter code:
+      led1.off();
+      led2.on();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering INIT_REFLECTANCE State]]"));
@@ -305,11 +309,12 @@ void loop()
     } //end enter code
     // do/ :
     IrThreshold::setReflectanceThreshold();
-    stateCurrent = STATE_DARK;
+    stateCurrent = IrReflectanceSensor::isPresent() ? STATE_SEEKING : STATE_ACTIVE;
     if (stateCurrent != statePrevious)
     {
       //exit code:
       stateInitReflectanceMillis = millis();
+      led2.off();
     }
     break;
   /*********************
@@ -320,6 +325,8 @@ void loop()
     {
       statePrevious = stateCurrent;
       //enter code:
+      led1.flicker();
+      led2.off();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering ACTIVE State]]"));
@@ -374,6 +381,8 @@ void loop()
     if (stateCurrent != statePrevious)
     { // onEntry
       statePrevious = stateCurrent;
+      led1.flicker();
+      led2.on();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
@@ -428,6 +437,8 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.blink(500,9500);
+      led2.off();
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -460,6 +471,10 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.off();
+      led2.on();
+      led1.blink(700,4300);
+      led2.blink(200,4800);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -493,6 +508,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.blink(600,400);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -512,6 +528,7 @@ void loop()
       manualLaserPulseMillis = millis();
       if (IrReflectanceSensor::isPresent())
       {
+        led2.blink(1,1);
         if ((manualLaserPulseMask & B00000001) == B00000001)
         {
           LaserController::turnOn();
@@ -523,6 +540,7 @@ void loop()
       }
       else
       { // no reflectance
+        led2.off();
         if ((manualLaserPulseMask & B00000001) == B00000001)
         {
           LaserController::turnOff();
@@ -559,7 +577,8 @@ void loop()
   LaserController::update();
   AmbientLightSensor::update();
   stepper_controller.update();
-  digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
+  led1.update();
+  led2.update();
 
   ////////// DEBUG OUTPUT:
 
@@ -694,6 +713,8 @@ void checkServoKnobs()
 
 void do_pre_laser_rotation()
 {
+  led1.flicker();
+  led2.flicker();
   int original_speed = stepper_controller.getSpeedLimitPercent();
       stepper_controller.setSpeedLimitPercent(100);
       for (int i = 2; i <= 4; i++)
@@ -702,6 +723,8 @@ void do_pre_laser_rotation()
         while (!stepper_controller.is_stopped())
         {
           stepper_controller.update();
+          led1.update();
+          led2.update();
         }
       }
       // the long number of steps taken was messing up the seek rotation limit; this should reset it to a reasonable value
