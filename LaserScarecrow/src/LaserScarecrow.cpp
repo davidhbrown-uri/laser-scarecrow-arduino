@@ -37,6 +37,7 @@ void checkSpeedKnob();
 void checkServoKnobs();
 void findReflectanceThreshold();
 int findShortestUsableSpan();
+void do_pre_laser_rotation();
 
 /*****************
    GLOBALS
@@ -273,17 +274,7 @@ void loop()
       stepper_controller.init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
-      int original_speed = stepper_controller.getSpeedLimitPercent();
-      stepper_controller.setSpeedLimitPercent(100);
-      for (int i = 1; i < 4; i++)
-      {
-        stepper_controller.move(i * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 2);
-        while (!stepper_controller.is_stopped())
-        {
-          stepper_controller.update();
-        }
-      }
-      stepper_controller.setSpeedLimitPercent(original_speed);
+      
     } // finish /enter code
     //update:
     stateCurrent = STATE_INIT_REFLECTANCE;
@@ -412,6 +403,13 @@ void loop()
     }
     if (stepper_controller.get_steps_taken_this_move() > seekingMicrostepsLimit)
     {
+#ifdef DEBUG_SERIAL
+      if (serialCanWrite)
+        Serial.print(F("!!! Seeking Rotation limit: "));
+        Serial.print(stepper_controller.get_steps_taken_this_move());
+        Serial.print(F(" steps this move exceeds "));
+        Serial.println(seekingMicrostepsLimit);
+#endif // DEBUG_SERIAL
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
     if (stateManual)
@@ -452,6 +450,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      do_pre_laser_rotation();
     }
     break;
   /*********************
@@ -484,6 +483,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      do_pre_laser_rotation();
     }
     break;
     /**************************
@@ -690,4 +690,21 @@ void checkServoKnobs()
     currentSettings.servo_max = pulseHigh;
     //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
   }
+}
+
+void do_pre_laser_rotation()
+{
+  int original_speed = stepper_controller.getSpeedLimitPercent();
+      stepper_controller.setSpeedLimitPercent(100);
+      for (int i = 2; i <= 4; i++)
+      {
+        stepper_controller.move((i/2) * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR);
+        while (!stepper_controller.is_stopped())
+        {
+          stepper_controller.update();
+        }
+      }
+      // the long number of steps taken was messing up the seek rotation limit; this should reset it to a reasonable value
+      stepper_controller.move(1);
+      stepper_controller.setSpeedLimitPercent(original_speed);
 }

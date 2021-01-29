@@ -286,8 +286,12 @@
 //on the cheap knockoffs, the LEDs are illuminated when the pin is low
 #define LED1_PIN LED_BUILTIN_RX
 #define LED1_INVERT true
+#define LED1_ON LOW
+#define LED1_OFF HIGH
 #define LED2_PIN LED_BUILTIN_TX
 #define LED2_INVERT true
+#define LED2_ON LOW
+#define LED2_OFF HIGH
  
  /***************************
  * DEBUG Flags

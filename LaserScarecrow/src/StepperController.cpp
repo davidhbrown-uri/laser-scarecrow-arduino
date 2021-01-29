@@ -86,12 +86,7 @@ void StepperController::update()
     switch (_event)
     {
     case STEPPER_CONTROLLER_EVENT_MOVE:
-#ifdef DEBUG_SERIAL
-#ifdef DEBUG_STEPPER_CONTROLLER
-      Serial.print(F("StepperController moving by "));
-      Serial.println(_stepsRequested);
-#endif
-#endif
+
       if (_direction != (_stepsRequested >= 0)) // need to change direction
       {
         if (_isr_steps_remaining == 0) // have to finish previous move
@@ -104,6 +99,12 @@ void StepperController::update()
       }    // do direction change
       else // we can do the move
       {
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_STEPPER_CONTROLLER
+      Serial.print(F("StepperController moving by "));
+      Serial.println(_stepsRequested);
+#endif
+#endif
         _isr_steps_remaining = (unsigned long)(abs(_stepsRequested));
         _isr_steps_taken = 0;
         _stepsRequested = 0;                    // clear so we can tell if we've stopped
@@ -192,7 +193,7 @@ void StepperController::move_extend(int steps)
 
 unsigned long StepperController::get_steps_taken_this_move()
 {
-  return _isr_steps_taken;
+  return is_stopped() ? 0 : _isr_steps_taken;
 }
 
 void StepperController::setSpeedLimitPercent(int percent)
@@ -284,7 +285,6 @@ void StepperController::isr(StepperController *stepper_contoller)
     if ((stepper_contoller->_isr_steps_remaining > stepper_contoller->_isr_top_accel_table_current_index) &&
         stepper_contoller->_isr_top_accel_table_current_index < stepper_contoller->_isr_top_accel_table_max_index)
     {
-      digitalWrite(LED1_PIN, HIGH);
       stepper_contoller->_isr_top_accel_table_current_index++;
     }
     // decelerate if isr_steps_remaining < timer_top_accel_table_current_index and isr_steps_taken > timer_steps_midpoint
@@ -292,7 +292,6 @@ void StepperController::isr(StepperController *stepper_contoller)
         stepper_contoller->_isr_steps_remaining < stepper_contoller->_isr_top_accel_table_current_index && stepper_contoller->_isr_steps_taken > stepper_contoller->_isr_steps_remaining && stepper_contoller->_isr_top_accel_table_current_index > 0)
     {
       stepper_contoller->_isr_top_accel_table_current_index--;
-      digitalWrite(LED1_PIN, LOW);
     }
 
     // OCR3A = compare match register A is TOP; set to prescale = 64, so 4μs per tick on 16MHz clock
