@@ -1,4 +1,6 @@
 #include "IrThreshold.h"
+#include "StepperController.h"
+extern StepperController stepper_controller;
 #define REFLECTANCE_BINCOUNT 32
 
 uint16_t IrThreshold::reflectance_readings[IR_REFLECTANCE_READINGS];
@@ -72,15 +74,18 @@ void IrThreshold::scanReflectance()
     Serial.println(F("\r\nScanning for reflectance (scaled 0x0-0xF):"));
 #endif
 #endif
-  StepperController::setStepsToStep(0);
-  StepperController::runHalfstep();
+  stepper_controller.move_stop();
+  while (!stepper_controller.is_stopped())
+  {
+    stepper_controller.update();
+  }
   for (int i = 0; i < IR_REFLECTANCE_READINGS; i++)
   {
     // move backwards to make this behavior easier to see/understand
-    StepperController::setStepsToStep(-IR_REFLECTANCE_STEPS_PER_READ);
-    while (StepperController::getStepsToStep() != 0)
+    stepper_controller.move(-IR_REFLECTANCE_STEPS_PER_READ);
+    while (!stepper_controller.is_stopped())
     {
-      ;
+      stepper_controller.update();
     }
     reflectance_readings[i] = IrReflectanceSensor::readAverage(IR_REFLECTANCE_SCANNING_AVERAGING);
 #ifdef DEBUG_SERIAL
@@ -357,13 +362,13 @@ void IrThreshold::setReflectanceThreshold()
     findShortestAbsentSpan();
     findLongestPresentSpan();
     // when the laser is active, step randomly from...
-    currentSettings.stepper_randomsteps_max = ((int)span_shortest_absent) * 2 / 3;              // two thirds the smallest no-tape span forwards
-    currentSettings.stepper_randomsteps_min = currentSettings.stepper_randomsteps_max * -5 / 7; // 70% of that backwards
+    currentSettings.stepper_randomsteps_max = max(STEPPER_TRAVEL_MICROSTEPS_MAX, ((int)span_shortest_absent) * 2 / 3); // two thirds the smallest no-tape span forwards
+    currentSettings.stepper_randomsteps_min = max(STEPPER_TRAVEL_MICROSTEPS_MIN, (int)span_shortest_absent / 5);
     // when seeking / skipping tape...
     currentSettings.stepper_stepsWhileSeeking = max(
-                                                    STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 8, // step at least 1/8 rotation
-                                                    ((int)span_longest_present) * 2 / 3)                                // or up to 2/3 the longest detected span of tape
-                                                / STEPPER_MICROSTEPPING_DIVISOR;                                        // seeking is done with whole steps
+        STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR / 8, // step at least 1/8 rotation
+        ((int)span_longest_present * 11 / 10))                              // 110% of the longest detected span of tape
+        ;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_REFLECTANCE_THRESHOLD
     if (serialCanWrite)
@@ -500,8 +505,8 @@ int findShortestUsableSpan() {
     long stepsStepped = 0L;
     int matchingStepCount = 0;
     while(matchingStepCount < MATCH_STEPS && stepsStepped < STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR) {
-      StepperController::setStepsToStep(1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      stepper_controller.setStepsToStep(1);
+      while (stepper_controller.getStepsToStep() != 0) { ; }//wait for it
       stepsStepped++;
       currentStepIsPresent=IrReflectanceSensor::isPresent();
       if(currentStepIsPresent && previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
@@ -517,8 +522,8 @@ int findShortestUsableSpan() {
     stepsStepped = 0L;
     matchingStepCount = 0;
     while(matchingStepCount < MATCH_STEPS && stepsStepped < stepsInCircle) {
-      StepperController::setStepsToStep(-1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      stepper_controller.setStepsToStep(-1);
+      while (stepper_controller.getStepsToStep() != 0) { ; }//wait for it
       stepsStepped++;
       currentStepIsPresent=IrReflectanceSensor::isPresent();
       if(!currentStepIsPresent && !previousStepIsPresent) { matchingStepCount++; } else { matchingStepCount=0; }
@@ -535,8 +540,8 @@ int findShortestUsableSpan() {
    //cover the rest of the circle, still moving backward
    matchingStepCount = 0;
    for(int i = spanLength; i < stepsInCircle; i++) {
-      StepperController::setStepsToStep(-1);
-      while (StepperController::getStepsToStep() != 0) { ; }//wait for it
+      stepper_controller.setStepsToStep(-1);
+      while (stepper_controller.getStepsToStep() != 0) { ; }//wait for it
       currentStepIsPresent=IrReflectanceSensor::isPresent();
       if(currentStepIsPresent == previousStepIsPresent) { matchingStepCount++; } else {matchingStepCount = 0; }
       previousStepIsPresent=currentStepIsPresent;

@@ -9,6 +9,8 @@
 /** @see SettingsObserver.h */
 #include "SettingsObserver.h"
 #include <EEPROM.h>
+#include "StepperController.h"
+extern StepperController stepper_controller;
 
 Settings SettingsObserver::_settings;
 bool SettingsObserver::_unsaved = false;
@@ -20,22 +22,6 @@ void SettingsObserver::init()
 void SettingsObserver::process()
 {
   bool foundChanges = false;
-
-  /* future: StepperController doesn't have applySettings yet as there are no controls
-    // Check Stepper
-    if ( _settings.stepper_randomsteps_min != currentSettings.stepper_randomsteps_min
-      || _settings.stepper_randomsteps_max != currentSettings.stepper_randomsteps_max
-      || _settings.stepper_stepsWhileSeeking != currentSettings.stepper_stepsWhileSeeking)
-      {
-        StepperController::applySettings(&currentSettings);
-        foundChanges=true;
-    #ifdef DEBUG_SERIAL
-    #ifdef DEBUG_SETTINGSOBSERVER
-    Serial.println(F("\r\nSettingsObserver found changes in Stepper settings"));
-    #endif
-    #endif
-      }
-  */
 
   // Check Light sensor
   if ( _settings.light_sensor_threshold != currentSettings.light_sensor_threshold)
@@ -51,13 +37,13 @@ void SettingsObserver::process()
 
 
   // Check Light sensor
-  if ( _settings.interrupt_frequency != currentSettings.interrupt_frequency)
+  if ( _settings.stepper_speed_limit_percent != currentSettings.stepper_speed_limit_percent)
   {
-    Interrupt::applySettings(&currentSettings);
+    stepper_controller.applySettings(&currentSettings);
     foundChanges = true;
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_SETTINGSOBSERVER
-    Serial.println(F("\r\nSettingsObserver found changes in Interrupt settings"));
+    Serial.println(F("\r\nSettingsObserver found changes in Stepper speed limit"));
 #endif
 #endif
   }
@@ -106,11 +92,11 @@ bool SettingsObserver::save(Settings *settings_ptr)
 {
   int address = 0;
   uint32_t checksum = settingsCRC(settings_ptr);
-  //write type id, "LS18"
-  EEPROM.update(address++, 76); // "L"
-  EEPROM.update(address++, 83); // "S"
-  EEPROM.update(address++, 49); // "1"
-  EEPROM.update(address++, 56); // "8"
+  //write type id, "LS20"
+  EEPROM.update(address++, 'L'); // "L"
+  EEPROM.update(address++, 'S'); // "S"
+  EEPROM.update(address++, '2'); // "2"
+  EEPROM.update(address++, '0'); // "0"
   uint16_t settingsSize = sizeof(*settings_ptr);
   EEPROM.put(address, settingsSize);
   address += 2;
@@ -132,11 +118,11 @@ bool SettingsObserver::checkHeader(Settings *settings_ptr)
 {
   bool success = true;
   int address = 0;
-  // file type id, "LS18"
-  success &= EEPROM.read(address++) == 76; // "L"
-  success &= EEPROM.read(address++) == 83; // "S"
-  success &= EEPROM.read(address++) == 49; // "1"
-  success &= EEPROM.read(address++) == 56; // "8"
+  // file type id, "LS20"
+  success &= EEPROM.read(address++) == 'L'; // "L"
+  success &= EEPROM.read(address++) == 'S'; // "X"
+  success &= EEPROM.read(address++) == '2'; // "2"
+  success &= EEPROM.read(address++) == '0'; // "0"
   uint16_t settingsSize = 0;
   EEPROM.get(address, settingsSize);
   success &= settingsSize == sizeof(*settings_ptr);

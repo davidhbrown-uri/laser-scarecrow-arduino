@@ -5,11 +5,14 @@
    https://github.com/davidhbrown-uri/laser-scarecrow-arduino
 
 */
-
 /**
    @see CommandProcessor.h
 */
 #include "CommandProcessor.h"
+#include "StepperController.h"
+extern StepperController stepper_controller;
+
+
 CommandProcessor::CommandProcessor()
 {
   status = CPSTATUS_Ready;
@@ -62,7 +65,7 @@ void CommandProcessor::process()
             processOK();
             break;
           case CPCODE_InterruptRate:
-            stream->println(settings->interrupt_frequency);
+            stream->println(settings->stepper_speed_limit_percent);
             processOK();
             break;
           /*
@@ -72,7 +75,7 @@ void CommandProcessor::process()
             break;
           */
           case CPCODE_StepperTargetMicrosteps:
-            stream->println(StepperController::getStepsToStep());
+            stream->println(stepper_controller.is_stopped()?0:1);
             processOK();
             break;
           case CPCODE_ServoMinimum:
@@ -126,7 +129,7 @@ void CommandProcessor::process()
           case CPCODE_StepperMicrostepPositive: // move this many steps forward
             if (command->parameterCount == 1) // check that param0 is in integer range?
             {
-              StepperController::setStepsToStep((int) command->parameter[0]);
+              stepper_controller.move((int) command->parameter[0]);
               processOK();
             }
             else
@@ -137,7 +140,7 @@ void CommandProcessor::process()
           case CPCODE_StepperMicrostepNegative: // move this many steps backward
             if (command->parameterCount == 1) // check that param0 is in integer range?
             {
-              StepperController::setStepsToStep(0 - (int) command->parameter[0]);
+              stepper_controller.move(0 - (int) command->parameter[0]);
               processOK();
             }
             else
@@ -160,7 +163,7 @@ void CommandProcessor::process()
             {
               /* @todo get limits from configuration */
               /* @todo rename Rate to Frequency */
-              settings->interrupt_frequency = map(command->parameter[0], 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+              settings->stepper_speed_limit_percent = map(command->parameter[0], 0, 1023, 0, 100);
               processOK();
             } else
             {
