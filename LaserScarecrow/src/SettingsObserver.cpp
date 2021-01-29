@@ -120,7 +120,7 @@ bool SettingsObserver::checkHeader(Settings *settings_ptr)
   int address = 0;
   // file type id, "LS20"
   success &= EEPROM.read(address++) == 'L'; // "L"
-  success &= EEPROM.read(address++) == 'S'; // "X"
+  success &= EEPROM.read(address++) == 'S'; // "S" or "X" to test/fail
   success &= EEPROM.read(address++) == '2'; // "2"
   success &= EEPROM.read(address++) == '0'; // "0"
   uint16_t settingsSize = 0;
