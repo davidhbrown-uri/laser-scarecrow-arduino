@@ -275,7 +275,7 @@ void loop()
       stepper_controller.init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
-      
+
     } // finish /enter code
     //update:
     stateCurrent = STATE_INIT_REFLECTANCE;
@@ -339,6 +339,7 @@ void loop()
     // check for transition events (later checks have priority)
     if (millis() - stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS)
     {
+      /** @todo set stateInitReflectanceMillis in STATE_INIT_REFLECTANCE, not here */
       stateInitReflectanceMillis = millis();
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
@@ -387,7 +388,7 @@ void loop()
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
-      stepper_controller.applySettings(&currentSettings);
+      stepper_controller.runFullSpeed();
       LaserController::turnOff();
       ServoController::stop();
       if (!stepper_controller.is_stopped())
@@ -415,9 +416,9 @@ void loop()
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.print(F("!!! Seeking Rotation limit: "));
-        Serial.print(stepper_controller.get_steps_taken_this_move());
-        Serial.print(F(" steps this move exceeds "));
-        Serial.println(seekingMicrostepsLimit);
+      Serial.print(stepper_controller.get_steps_taken_this_move());
+      Serial.print(F(" steps this move exceeds "));
+      Serial.println(seekingMicrostepsLimit);
 #endif // DEBUG_SERIAL
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
@@ -427,7 +428,7 @@ void loop()
     }
     if (stateCurrent != statePrevious)
     {
-      //exit code:
+      stepper_controller.runSetSpeed();
     }
     break;
   /*********************
@@ -437,7 +438,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
-      led1.blink(500,9500);
+      led1.blink(500, 9500);
       led2.off();
       //enter code:
 #ifdef DEBUG_SERIAL
@@ -473,8 +474,8 @@ void loop()
       statePrevious = stateCurrent;
       led1.off();
       led2.on();
-      led1.blink(700,4300);
-      led2.blink(200,4800);
+      led1.blink(700, 4300);
+      led2.blink(200, 4800);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -508,7 +509,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
-      led1.blink(600,400);
+      led1.blink(600, 400);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -528,7 +529,7 @@ void loop()
       manualLaserPulseMillis = millis();
       if (IrReflectanceSensor::isPresent())
       {
-        led2.blink(1,1);
+        led2.blink(1, 1);
         if ((manualLaserPulseMask & B00000001) == B00000001)
         {
           LaserController::turnOn();
@@ -715,19 +716,18 @@ void do_pre_laser_rotation()
 {
   led1.flicker();
   led2.flicker();
-  int original_speed = stepper_controller.getSpeedLimitPercent();
-      stepper_controller.setSpeedLimitPercent(100);
-      for (int i = 2; i <= 4; i++)
-      {
-        stepper_controller.move((i/2) * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR);
-        while (!stepper_controller.is_stopped())
-        {
-          stepper_controller.update();
-          led1.update();
-          led2.update();
-        }
-      }
-      // the long number of steps taken was messing up the seek rotation limit; this should reset it to a reasonable value
-      stepper_controller.move(1);
-      stepper_controller.setSpeedLimitPercent(original_speed);
+  stepper_controller.runFullSpeed();
+  for (int i = 2; i <= 4; i++)
+  {
+    stepper_controller.move((i / 2) * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR);
+    while (!stepper_controller.is_stopped())
+    {
+      stepper_controller.update();
+      led1.update();
+      led2.update();
+    }
+  }
+  // the long number of steps taken was messing up the seek rotation limit; this should reset it to a reasonable value
+  stepper_controller.move(1);
+  stepper_controller.runSetSpeed();
 }

@@ -23,6 +23,7 @@ private:
   unsigned long _waitBeganAtMS;
   unsigned long _waitDuration;
   bool _direction;
+  bool _limitSpeed;
   void _buildTable();
   void _initTimer();
 
@@ -66,6 +67,8 @@ public:
   void move_extend(int steps);
   void setSpeedLimitPercent(int percent);
   int getSpeedLimitPercent();
+  void runFullSpeed();
+  void runSetSpeed();
   void applySettings(Settings *settings);
   bool is_stopped();
   unsigned long get_steps_taken_this_move();
