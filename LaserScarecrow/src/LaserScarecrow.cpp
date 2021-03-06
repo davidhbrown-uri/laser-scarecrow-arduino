@@ -282,6 +282,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
       do_pre_laser_rotation();
     }
     break;
@@ -462,6 +463,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
       do_pre_laser_rotation();
     }
     break;
@@ -499,6 +501,7 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
       do_pre_laser_rotation();
     }
     break;
@@ -712,6 +715,12 @@ void checkServoKnobs()
   }
 }
 
+/**
+ * @brief Warning rotation before laser is enabled
+ * 
+ * This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
+ * 
+ */
 void do_pre_laser_rotation()
 {
   led1.flicker();
