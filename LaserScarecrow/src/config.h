@@ -303,14 +303,14 @@
 // serial debug data rate will use COMMAND_PROCESSOR_DATARATE_USB
 #define DEBUG_SERIAL_OUTPUT_INTERVAL_MS 10000
 // increase somewhat while debugging to make serial connection easier; 3 for production
-#define DEBUG_SERIAL_COUNTDOWN_SECONDS 5
+#define DEBUG_SERIAL_COUNTDOWN_SECONDS 3
 //#define DEBUG_LOOP_TIME
 //#define DEBUG_SERVO
 //#define DEBUG_KNOBS
 //#define DEBUG_LIGHTSENSOR
 //#define DEBUG_REFLECTANCE
 //#define DEBUG_REFLECTANCE_THRESHOLD
-#define DEBUG_SETTINGS
+//#define DEBUG_SETTINGS
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
 
