@@ -40,11 +40,27 @@ void LaserController::init()
 void LaserController::setDutyCycleMaxRuntime(unsigned long millis)
 {
   _dutyCycleMaxRuntime = millis;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_LASERCONTROLLER
+#ifdef DEBUG_LASER_DUTY_CYCLE
+  Serial.print(F("\r\nLaser duty cycle max runtime = "));
+  Serial.println(_dutyCycleMaxRuntime);
+#endif
+#endif
+#endif
 }
 
 void LaserController::setDutyCycleMinCooldown(unsigned long millis)
 {
   _dutyCycleMinCooldown = millis;
+#ifdef DEBUG_SERIAL
+#ifdef DEBUG_LASERCONTROLLER
+#ifdef DEBUG_LASER_DUTY_CYCLE
+  Serial.print(F("\r\nLaser duty cycle cooldown = "));
+  Serial.println(_dutyCycleMinCooldown);
+#endif
+#endif
+#endif
 }
 
 void LaserController::update()
@@ -89,16 +105,6 @@ void LaserController::update()
   }
   _lastRun_isOn = nextIsOn;
   _lastRun_millis = millis();
-}
-
-void LaserController::doInterrupt()
-{
-#ifdef LASER_TOGGLE_WITH_INTERRUPT
-  if (_isOn)
-  {
-    digitalWrite(LASER_PIN_POWER, !digitalRead(LASER_PIN_POWER));
-  }
-#endif
 }
 
 void LaserController::turnOn()

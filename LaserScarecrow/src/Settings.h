@@ -37,7 +37,7 @@
 // the SETTINGS_VERSION, but as it will be
 // stored in a single byte, if we ever reach
 // 256, roll over to 0.
-#define SETTINGS_VERSION 1
+#define SETTINGS_VERSION 2
 class Settings {
   public:
     Settings();
@@ -50,13 +50,11 @@ class Settings {
     //properties
     int stepper_randomsteps_min; //done but no control implemented
     int stepper_randomsteps_max; //done but no control implemented
+    int stepper_reverse_percent; 
     int stepper_stepsWhileSeeking; //done but no control implemented
     int light_sensor_threshold; //done but no control implemented
-    bool rtc_control; //depends on RTC feature not yet implemented
-    unsigned int rtc_wake; //depends on RTC feature not yet implemented
-    unsigned int rtc_sleep; //depends on RTC feature not yet implemented
     //int stepper_target; // not implemented -- not a setting! Part of current state.
-    int interrupt_frequency; // done, including knob control
+    int stepper_speed_limit_percent; 
     int servo_min; // done, including knob control
     int servo_max; // done, including knob control; changed name/concept from servo_range... while the knob controls range, it makes sense for the setting to be a point, not a delta
     int servo_hold_time; // done but no control implemented

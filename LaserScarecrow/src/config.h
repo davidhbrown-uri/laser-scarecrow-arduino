@@ -7,11 +7,13 @@
 
 #pragma once
 
-#define SOFTWARE_VERSION F("Version 2.6.2 - August 2020 release for 2020 kits")
+#define SOFTWARE_VERSION F("Version 2.8.0 - January 2021 release for 2020 kits")
 
 /*******************
    VERSION HISTORY
  *******************
+  2.8.0 - 2021-01-11: Implement better use of timer for acceleration/deceleration of stepper
+
   2.6.2 - 2020-08-21: Can now skip forward or backward over tape; pretty much eliminates chatter/grinding previously experienced when backing into tape
   
   2.6.1 - 2020-08-20: Light threshold: store / access min and max since power-on; fix rolling average in first n readings.
@@ -91,11 +93,7 @@
  * Default behavior configuration
  */
 
-// overall speed:
-#define INTERRUPT_FREQUENCY_DEFAULT 200
-#define STEPPER_RANDOMSTEPS_MIN -50
-#define STEPPER_RANDOMSTEPS_MAX 80
-#define STEPPER_STEPS_WHILE_SEEKING 17
+
 /* Ambient lux levels measured by ColorMunki -> threshold values
     Per https://en.wikipedia.org/wiki/Lux dark limit of twilight is 3.4 lux
      3 lux => 28~30  // office during thunderstorm 3pm
@@ -107,24 +105,28 @@
     130 lux => 270
 */
 #define AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD 250
-// Values for the servo that wiggles the laser up and down
-// The angle set will range from LOW to HIGH+WIGGLE
-// A new angle will be set at random every SERVO_HOLD_TIME_MS ms
-#define SERVO_HOLD_TIME_MS 500
-// wiggle was 6
-#define SERVO_ANGLE_WIGGLE 3
-// speed must not be > 255 - SERVO_ANGLE_HIGH or possible byte overflow error
-#define SERVO_ANGLE_SPEED 20
-#define SERVO_ANGLE_DWELL_TIME 2500L
 
 /****************************
  * Hardware Configuration
  */
+//======
+// LASER
+//======
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
-#define LASER_DUTYCYCLERUNTIME 1800000
-#define LASER_DUTYCYCLECOOLDOWN 300000
+//#define LASER_DUTYCYCLERUNTIME 1800000
+//#define LASER_DUTYCYCLECOOLDOWN 300000
+// for testing: 10sec duty; 30sec cooldown
+#define LASER_DUTYCYCLERUNTIME 10000
+#define LASER_DUTYCYCLECOOLDOWN 30000
+//=====
+//SERVO
+//=====
 // Pulse time units are in µs; ranges should be determined for each model of servo used
 // (Angle is too imprecise)
+// SAFETY_MIN/MAX for future software-configurable version
+// USABLE_MIN/MAX are limits in this version of the code
+// SERVO_PULSE_DELTA is the pulse width to change to cause a "just noticeable difference" in the servo position
+// SERVO_CHANGE_TIME_MS is a minimum time to wait between SERVO_PULSE_DELTA changes to avoid stressing the servo
 // 2017: MG90s purchased in 2017: control range apx 700µs to 2300µs
 // 2017: 1ms to 2ms resulted in 90-degree movement
 // 2017: Mounted horn on left because lower values rotate further clockwise.
@@ -132,24 +134,42 @@
 // 2018: Futaba 1307S: control range apx 700µs to 2300µs
 // 2018: Horn mounted on right; minimum angle = flat across top of crop; 
 // 2018:   increasing / maximum angle points down into canopy
-// 2018: Futaba S1307: useful range apx 560µs to 2050µs; movemen
+// 2018: Futaba S1307: useful range apx 560µs to 2050µs; 
 // 2018: Futaba S1307: movement stops (before physical limits) at 550µs, 2400µs
 #define SERVO_PULSE_SAFETY_MIN 550
 #define SERVO_PULSE_SAFETY_MAX 2400
 #define SERVO_PULSE_USABLE_MIN 560
 #define SERVO_PULSE_USABLE_MAX 2050
-#define SERVO_PULSE_DELTA_LIMIT 5
+#define SERVO_PULSE_DELTA 5
+#define SERVO_CHANGE_TIME_MS 3
+// Values for the servo that wiggles the laser up and down
+// A new position will be set at random every SERVO_HOLD_TIME_MS ms
+#define SERVO_HOLD_TIME_MS 500
 
+//=======
+//STEPPER
+//=======
 // based on the stepper motor:
 #define STEPPER_FULLSTEPS_PER_ROTATION 200
-// these adjust the rate of updates
-#define SERVO_POSTSCALE_MASK 0x0f
-#define SERVO_POSTSCALE_MASK_SEEKING 0xFF
-// had been 0x3f
-#define STEPPER_POSTSCALE_MASK 0x00
-// had been 0x1f; changed to 0x02 for belt drive; 0x00 for direct drive?
-#define STEPPER_POSTSCALE_MASK_SEEKING 0x00
 #define STEPPER_MICROSTEPPING_DIVISOR 2
+#define STEPPER_TRAVEL_MICROSTEPS_MIN 20
+#define STEPPER_TRAVEL_MICROSTEPS_MAX 150
+#define STEPPER_TRAVEL_REVERSE_PERCENT 30
+#define STEPPER_SPEED_LIMIT_PERCENT_DEFAULT 75
+// max delay is the SLOWEST speed
+#define STEPPER_MICROSEC_STEP_DELAY_MAX 12000
+// min delay is the FASTEST speed
+#define STEPPER_MICROSEC_STEP_DELAY_MIN 1800
+#define STEPPER_MICROSEC_ACCEL_STEP 130
+// delay this long to change direction without shaking too hard
+#define STEPPER_MILLISEC_DIRECTION_PAUSE 50
+#define STEPPER_TIMER_MICROSEC_PER_TICK 4
+// 1μs required per A4988 datasheet
+// when set to 5, measured almost 7; 2 => 4.5
+#define STEPPER_PULSE_MICROSECONDS 1
+//===========
+//TAPE SENSOR
+//===========
 // IR Reflectance readings are done during microstepping, so readings * step per read should equal 400 (200 if done at full speed)
 // in testing black tape on white bucket, mid-range reads correlate to distance from sensor: 1% @1cm; 5% @2cm; 8% @3cm
 // 2020-08: now requires 2 bytes RAM for each reading; must be divisor of (STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR)
@@ -182,8 +202,6 @@
 //tape is not found within that time,
 //it will ignore reflectance and operate full-circle.
 #define IR_REFLECTANCE_SEEKING_ROTATION_LIMIT 2
-//how often the RTC should refresh
-#define RTC_REFRESH_MILLIS 2000
 
 
 /***************************
@@ -198,10 +216,8 @@
 //DEPRECATED (use setDisabled() instead): #define IR_REFLECTANCE_DO_NOT_USE_THRESHOLD 1111
 // flash or steady
 //#define LASER_TOGGLE_WITH_INTERRUPT
-#define INTERRUPT_FREQUENCY_MIN 20
-#define INTERRUPT_FREQUENCY_MAX 150
 // these thresholds will be raw values when using AnalogInput
-#define INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD 20
+#define STEPPER_SPEED_KNOB_CHANGE_THRESHOLD 20
 #define SERVO_PULSE_KNOB_CHANGE_THRESHOLD 20
 //for testing, save settings 30000 ms (30 seconds) after last change; change to 100000 (100 seconds; we're telling them 2 minutes) for release
 //that long a delay was obnoxious. Changed to 15 seconds.
@@ -273,8 +289,12 @@
 //on the cheap knockoffs, the LEDs are illuminated when the pin is low
 #define LED1_PIN LED_BUILTIN_RX
 #define LED1_INVERT true
+#define LED1_ON LOW
+#define LED1_OFF HIGH
 #define LED2_PIN LED_BUILTIN_TX
 #define LED2_INVERT true
+#define LED2_ON LOW
+#define LED2_OFF HIGH
  
  /***************************
  * DEBUG Flags
@@ -294,8 +314,7 @@
 //#define DEBUG_SETTINGS_VERBOSE
 //#define DEBUG_SETTINGSOBSERVER
 
-//#define DEBUG_STEPPER
-//#define DEBUG_STEPPER_STEPS
+//#define DEBUG_STEPPER_CONTROLLER
 //#define DEBUG_LASERCONTROLLER
 //#define DEBUG_LASER_DUTY_CYCLE
 //#define DEBUG_INTERRUPT_FREQUENCY

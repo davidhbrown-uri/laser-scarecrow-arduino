@@ -7,9 +7,8 @@
 */
 #include <Arduino.h>
 #include "config.h"
-#include "Settings.h"
-#include "Interrupt.h"
 #include "StepperController.h"
+#include "Settings.h"
 #include "ServoController.h"
 #include "LaserController.h"
 #include "AmbientLightSensor.h"
@@ -20,7 +19,7 @@
 #include "Command.h"
 #include "CommandProcessor.h"
 #include "SettingsObserver.h"
-#include <Wire.h>
+#include "Led.h"
 
 // definitions for finite state machine
 // STATE_CONTINUE can be used to indicate that the current state should be continued
@@ -39,6 +38,7 @@ void checkSpeedKnob();
 void checkServoKnobs();
 void findReflectanceThreshold();
 int findShortestUsableSpan();
+void do_pre_laser_rotation();
 
 /*****************
    GLOBALS
@@ -54,7 +54,7 @@ unsigned long stateInitReflectanceMillis;
 unsigned long loopLedLastChangeMillis = 0L;
 unsigned long loopProcessLastMillis = 0L;
 unsigned long loopLastSerial = 0L;
-int seekingRotationLimitCountdown;
+unsigned long seekingMicrostepsLimit = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR;
 
 #ifdef DEBUG_AIMCONTROLLER
 #ifdef DEBUG_SERIAL
@@ -73,10 +73,13 @@ bool bt_connected = false;
 
 */
 Settings currentSettings;
+StepperController stepper_controller;
 Command uCommand, btCommand;
 CommandProcessor uProcessor, btProcessor;
 
 AnalogInput knobSpeed, knobAngleMin, knobAngleRange;
+
+Led led1(LED1_PIN, LED1_INVERT), led2(LED2_PIN, LED2_INVERT);
 
 #ifdef DEBUG_SERIAL
 #ifdef DEBUG_LOOP_TIME
@@ -102,18 +105,9 @@ void setup()
   }
 
   // Knobs
-  knobSpeed.begin(KNOB1_PIN, 5, 50, INTERRUPT_FREQUENCY_KNOB_CHANGE_THRESHOLD);
+  knobSpeed.begin(KNOB1_PIN, 5, 50, STEPPER_SPEED_KNOB_CHANGE_THRESHOLD);
   knobAngleMin.begin(KNOB2_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
   knobAngleRange.begin(KNOB3_PIN, 5, 50, SERVO_PULSE_KNOB_CHANGE_THRESHOLD);
-
-  // pending LedController
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-  digitalWrite(LED1_PIN, LED1_INVERT);
-  digitalWrite(LED2_PIN, LED2_INVERT);
-
-  // Wire and RTC
-  Wire.begin();
 
   pinMode(BT_PIN_STATE, INPUT);
 
@@ -129,7 +123,6 @@ void setup()
   uProcessor.setCommand(&uCommand);
   uProcessor.setSettings(&currentSettings);
   //future:  uProcessor.setConfiguration(&configuration);
-  //future:  uProcessor.setRTC(&rtc);
   uProcessor.setStream(&COMMAND_PROCESSOR_STREAM_USB);
 #endif
 #ifndef COMMAND_PROCESSOR_ENABLE_USB
@@ -147,7 +140,6 @@ void setup()
   btProcessor.setCommand(&btCommand);
   btProcessor.setSettings(&currentSettings);
   //future:  btProcessor.setConfiguration(&configuration);
-  //future:  btProcessor.setRTC(&rtc);
   btProcessor.setStream(&COMMAND_PROCESSOR_STREAM_BLUETOOTH);
 #ifdef DEBUG_BLUETOOTH
   COMMAND_PROCESSOR_STREAM_BLUETOOTH.println(SOFTWARE_VERSION);
@@ -226,8 +218,9 @@ void loop()
     *********************/
   case STATE_POWERON:
     currentSettings.init();
-    StepperController::init();
-    StepperController::stop();
+    stepper_controller.init();
+    led1.on();
+    led2.on();
 // Serial was possibly initialized by the USB command processor
 #ifdef DEBUG_SERIAL
     if (serialCanWrite)
@@ -255,6 +248,8 @@ void loop()
     {
       statePrevious = stateCurrent;
       // onEnter code:
+      led1.off();
+      led2.off();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering INIT State]]"));
@@ -277,16 +272,18 @@ void loop()
       }
       LaserController::init();
       ServoController::init();
-      StepperController::init();
+      stepper_controller.init();
       IrReflectanceSensor::init();
       AmbientLightSensor::init();
-      Interrupt::init();
+
     } // finish /enter code
     //update:
     stateCurrent = STATE_INIT_REFLECTANCE;
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
+      do_pre_laser_rotation();
     }
     break;
 
@@ -298,6 +295,8 @@ void loop()
     {
       statePrevious = stateCurrent;
       //enter code:
+      led1.off();
+      led2.on();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering INIT_REFLECTANCE State]]"));
@@ -305,17 +304,18 @@ void loop()
       LaserController::turnOff();
       LaserController::update(); // because this operation isn't looping
       ServoController::stop();
-      StepperController::stop();
-      Interrupt::applySettings(&currentSettings);
+      stepper_controller.move_stop();
+      stepper_controller.applySettings(&currentSettings);
       //laser is on here
     } //end enter code
     // do/ :
     IrThreshold::setReflectanceThreshold();
-    stateCurrent = STATE_DARK;
+    stateCurrent = IrReflectanceSensor::isPresent() ? STATE_SEEKING : STATE_ACTIVE;
     if (stateCurrent != statePrevious)
     {
       //exit code:
       stateInitReflectanceMillis = millis();
+      led2.off();
     }
     break;
   /*********************
@@ -326,30 +326,32 @@ void loop()
     {
       statePrevious = stateCurrent;
       //enter code:
+      led1.flicker();
+      led2.off();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering ACTIVE State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      stepper_controller.applySettings(&currentSettings);
       LaserController::turnOn();
       ServoController::run();
-      StepperController::runHalfstep();
-      // don't do this on entry, as it's might have been set by STATE_SEEKING; only do it if stepsToStep==0, below
-      //        StepperController::setStepsToStepRandom(
-      //          currentSettings.stepper_randomsteps_min,
-      //          currentSettings.stepper_randomsteps_max);
-    }
+    } // end /enter behavior
     //update:
     // check for transition events (later checks have priority)
     if (millis() - stateInitReflectanceMillis > IR_REFLECTANCE_RECALIBRATE_MS)
     {
+      /** @todo set stateInitReflectanceMillis in STATE_INIT_REFLECTANCE, not here */
       stateInitReflectanceMillis = millis();
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
     if (IrReflectanceSensor::isPresent())
+    {
       stateCurrent = STATE_SEEKING;
+    }
     if (LaserController::isCoolingDown())
+    {
       stateCurrent = STATE_COOLDOWN;
+    }
 
     // do not go dark if BT is connected, issue #37
     if (!bt_connected && AmbientLightSensor::isDark())
@@ -357,8 +359,14 @@ void loop()
       stateCurrent = STATE_DARK;
     }
     // do our things:
-    if (StepperController::getStepsToStep() == 0)
-      StepperController::setStepsToStepRandom(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max);
+    if (stepper_controller.is_stopped())
+    {
+      stepper_controller.move(
+          random(currentSettings.stepper_randomsteps_min, currentSettings.stepper_randomsteps_max) *
+          (random(0, 100) < STEPPER_TRAVEL_REVERSE_PERCENT ? -1 : 1));
+    }
+    ServoController::update();
+
     if (stateManual)
     {
       stateCurrent = STATE_MANUAL;
@@ -372,23 +380,24 @@ void loop()
       SEEKING
     *********************/
   case STATE_SEEKING:
-    bool seeking_backwards;
     if (stateCurrent != statePrevious)
     { // onEntry
       statePrevious = stateCurrent;
+      led1.flicker();
+      led2.on();
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering SEEKING State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      stepper_controller.runFullSpeed();
       LaserController::turnOff();
       ServoController::stop();
-      StepperController::runFullstep();
-      seeking_backwards = StepperController::getStepsToStep() < 0;
-      seekingRotationLimitCountdown = IR_REFLECTANCE_SEEKING_ROTATION_LIMIT * STEPPER_FULLSTEPS_PER_ROTATION / currentSettings.stepper_stepsWhileSeeking;
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
+      if (!stepper_controller.is_stopped())
+      {
+        stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
+      }
     }
-    //update:
+    //do/
     //check for transition
     if (!IrReflectanceSensor::isPresent())
     {
@@ -396,16 +405,22 @@ void loop()
       // force some additional movement to avoid lots of chattering at trailing edge of tape
       // as of version 2.1.1, stepper_randomsteps_max should be half the width of the smallest usable span
       // ... but it's still getting hung up on the edge of tape, so let's go at least 1/4 of the smallest usable span out.
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * (random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max)));
+      //      stepper_controller.move_extend(random(currentSettings.stepper_randomsteps_max / 2, currentSettings.stepper_randomsteps_max));
     }
     //do our things:
-    if (StepperController::getStepsToStep() == 0)
+    if (stepper_controller.is_stopped())
     {
-      StepperController::setStepsToStep((seeking_backwards ? -1 : 1) * currentSettings.stepper_stepsWhileSeeking);
-      seekingRotationLimitCountdown--;
+      stepper_controller.move_extend(currentSettings.stepper_stepsWhileSeeking);
     }
-    if (seekingRotationLimitCountdown == 0)
+    if (stepper_controller.get_steps_taken_this_move() > seekingMicrostepsLimit)
     {
+#ifdef DEBUG_SERIAL
+      if (serialCanWrite)
+        Serial.print(F("!!! Seeking Rotation limit: "));
+      Serial.print(stepper_controller.get_steps_taken_this_move());
+      Serial.print(F(" steps this move exceeds "));
+      Serial.println(seekingMicrostepsLimit);
+#endif // DEBUG_SERIAL
       stateCurrent = STATE_INIT_REFLECTANCE;
     }
     if (stateManual)
@@ -414,7 +429,7 @@ void loop()
     }
     if (stateCurrent != statePrevious)
     {
-      //exit code:
+      stepper_controller.runSetSpeed();
     }
     break;
   /*********************
@@ -424,6 +439,8 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.blink(500, 9500);
+      led2.off();
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -431,9 +448,8 @@ void loop()
 #endif // DEBUG_SERIAL
       LaserController::turnOff();
       ServoController::stop();
-      StepperController::stop();
-      // might save a bit of power, but mostly wanting a slow blink rate:
-      Interrupt::setFrequency(1);
+      stepper_controller.turn_off();
+      // TODO: slow blink rate?
     }
     //update:
     if (AmbientLightSensor::isLight())
@@ -447,6 +463,8 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
+      do_pre_laser_rotation();
     }
     break;
   /*********************
@@ -456,6 +474,10 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.off();
+      led2.on();
+      led1.blink(700, 4300);
+      led2.blink(200, 4800);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
@@ -464,10 +486,8 @@ void loop()
       LaserController::turnOff(); // it may already have done this itself.
       //servo detach
       ServoController::stop();
-      StepperController::runHalfstep();
-      StepperController::setStepsToStep(0);
-      // might save a bit of power, but mostly wanting a moderate blink rate:
-      Interrupt::setFrequency(3);
+      stepper_controller.turn_off();
+      // TODO: moderate blink rate:
     }
     //update:
     if (!LaserController::isCoolingDown())
@@ -481,6 +501,8 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       //exit code:
+      // This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
+      do_pre_laser_rotation();
     }
     break;
     /**************************
@@ -490,15 +512,15 @@ void loop()
     if (stateCurrent != statePrevious)
     {
       statePrevious = stateCurrent;
+      led1.blink(600, 400);
       //enter code:
 #ifdef DEBUG_SERIAL
       if (serialCanWrite)
         Serial.println(F("\r\n[[Entering MANUAL State]]"));
 #endif // DEBUG_SERIAL
-      Interrupt::applySettings(&currentSettings);
+      stepper_controller.applySettings(&currentSettings);
       LaserController::turnOff();
-      StepperController::runHalfstep();
-      StepperController::setStepsToStep(0);
+      stepper_controller.move_stop();
       ServoController::runManually();
       manualLaserPulseMillis = millis();
     } // enter code
@@ -510,6 +532,7 @@ void loop()
       manualLaserPulseMillis = millis();
       if (IrReflectanceSensor::isPresent())
       {
+        led2.blink(1, 1);
         if ((manualLaserPulseMask & B00000001) == B00000001)
         {
           LaserController::turnOn();
@@ -521,6 +544,7 @@ void loop()
       }
       else
       { // no reflectance
+        led2.off();
         if ((manualLaserPulseMask & B00000001) == B00000001)
         {
           LaserController::turnOff();
@@ -556,7 +580,9 @@ void loop()
   // timing-imprecise tasks:
   LaserController::update();
   AmbientLightSensor::update();
-  digitalWrite(LED2_PIN, IrReflectanceSensor::isPresent() ^ LED2_INVERT);
+  stepper_controller.update();
+  led1.update();
+  led2.update();
 
   ////////// DEBUG OUTPUT:
 
@@ -565,10 +591,10 @@ void loop()
   loopCount++;
 #endif
   long loopsTotalDuration = millis() - loopLastSerial;
-  loopLastSerial = millis();
   bool outputSerialDebug = (loopsTotalDuration > DEBUG_SERIAL_OUTPUT_INTERVAL_MS);
   if (outputSerialDebug && Serial)
   {
+    loopLastSerial = millis();
     Serial.println();
 #ifdef DEBUG_LOOP_TIME
     Serial.print(F("Average loop duration (ms): "));
@@ -600,9 +626,16 @@ void loop()
     Serial.print(AmbientLightSensor::read());
     Serial.print(AmbientLightSensor::isLight() ? F(" (Light)") : F(" (Dark)"));
 #endif
-#ifdef DEBUG_STEPPER
-    Serial.print("\r\nStepperController::getStepsToStep = ");
-    Serial.print(StepperController::getStepsToStep());
+#ifdef DEBUG_STEPPER_CONTROLLER
+    if (stepper_controller.is_stopped())
+    {
+      Serial.println(F("StepperController is stopped"));
+    }
+    else
+    {
+      Serial.print(F("StepperController steps this move = "));
+      Serial.println(stepper_controller.get_steps_taken_this_move());
+    }
 #endif
 #ifdef DEBUG_SERVO
     Serial.print(F("\r\nServoController::pulse="));
@@ -637,38 +670,17 @@ void loop()
    INTERRUPT HANDLERS
 */
 
-inline void doInterrupt()
+ISR(TIMER3_COMPA_vect)
 {
-  digitalWrite(LED1_PIN, !digitalRead(LED1_PIN));
-  ServoController::update();
-  StepperController::update();
+  StepperController::isr(&stepper_controller);
 #ifdef LASER_TOGGLE_WITH_INTERRUPT
   LaserController::doInterrupt();
 #endif
 }
-#ifdef INTERRUPTS_ATmega328P_T2
-#define INTERRUPT_VECT TIMER2_COMPA_vect
-ISR(TIMER2_COMPA_vect)
-{
-  doInterrupt();
-}
-#endif
-#ifdef INTERRUPTS_ATmega32U4_T1
-ISR(TIMER1_COMPA_vect)
-{
-  doInterrupt();
-}
-#endif
-#ifdef INTERRUPTS_ATmega32U4_T3
-ISR(TIMER3_COMPA_vect)
-{
-  doInterrupt();
-}
-#endif
 
 /*****************
    Helper functions
-   Put things here that require access to multuple modules
+   Put things here that require access to multiple modules
 */
 
 void checkSpeedKnob()
@@ -676,7 +688,7 @@ void checkSpeedKnob()
   knobSpeed.process();
   if (knobSpeed.hasNewValue())
   {
-    currentSettings.interrupt_frequency = map(knobSpeed.getValue(), 0, 1023, INTERRUPT_FREQUENCY_MIN, INTERRUPT_FREQUENCY_MAX);
+    currentSettings.stepper_speed_limit_percent = map(knobSpeed.getValue(), 0, 1023, 0, 100);
     knobSpeed.acknowledgeNewValue();
     // Interrupt::applySettings(& currentSettings); // won't need once we have the SettingsObserver
 #ifdef DEBUG_SERIAL
@@ -701,4 +713,30 @@ void checkServoKnobs()
     currentSettings.servo_max = pulseHigh;
     //let SettingsObserver do this: ServoController::applySettings(& currentSettings);
   }
+}
+
+/**
+ * @brief Warning rotation before laser is enabled
+ * 
+ * This is part of our implementation of a pre-emission warning delay per CFR 21 J 1040.10(f)(5)(iii)
+ * 
+ */
+void do_pre_laser_rotation()
+{
+  led1.flicker();
+  led2.flicker();
+  stepper_controller.runFullSpeed();
+  for (int i = 2; i <= 4; i++)
+  {
+    stepper_controller.move((i / 2) * STEPPER_FULLSTEPS_PER_ROTATION * STEPPER_MICROSTEPPING_DIVISOR);
+    while (!stepper_controller.is_stopped())
+    {
+      stepper_controller.update();
+      led1.update();
+      led2.update();
+    }
+  }
+  // the long number of steps taken was messing up the seek rotation limit; this should reset it to a reasonable value
+  stepper_controller.move(1);
+  stepper_controller.runSetSpeed();
 }

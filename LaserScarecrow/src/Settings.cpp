@@ -17,16 +17,11 @@ Settings::Settings()
   init();
 }
 void Settings::init() {
-  stepper_randomsteps_min = STEPPER_RANDOMSTEPS_MIN;
-  stepper_randomsteps_max = STEPPER_RANDOMSTEPS_MAX;
-  stepper_stepsWhileSeeking = STEPPER_STEPS_WHILE_SEEKING;
-  rtc_control = 0; //use light sensor
+  stepper_randomsteps_min = STEPPER_TRAVEL_MICROSTEPS_MIN;
+  stepper_randomsteps_max = STEPPER_TRAVEL_MICROSTEPS_MAX;
+  stepper_reverse_percent = STEPPER_TRAVEL_REVERSE_PERCENT;
   light_sensor_threshold = AMBIENTLIGHTSENSOR_DEFAULT_THRESHOLD;
-  // selection of defaults based on twilight extremes in June and July 2018 from:
-  // https://www.sunrisesunset.com/USA/RhodeIsland/
-  rtc_wake = 278; // 4:38 AM... 4h * 60 + 38m = 278 minutes
-  rtc_sleep = 1258; // 8:58pm... 20h * 60 + 58m = 1258 minutes
-  interrupt_frequency = INTERRUPT_FREQUENCY_DEFAULT;
+  stepper_speed_limit_percent = STEPPER_SPEED_LIMIT_PERCENT_DEFAULT;
   servo_min = SERVO_PULSE_USABLE_MIN;
   servo_max = SERVO_PULSE_USABLE_MAX;
   servo_hold_time = SERVO_HOLD_TIME_MS;
@@ -39,33 +34,21 @@ void Settings::printToStream(Stream *st)
   //header
   st->println(F(">>> Settings:"));
   //knob equivalents:
-  st->print(F(" >> Speed (interrupt frequency Hz) = "));
-  st->println(interrupt_frequency);
+  st->print(F(" >> Stepper Speed (percent) = "));
+  st->println(stepper_speed_limit_percent);
   st->print(F(" >> Servo min/max (pulse width) = "));
   st->print(servo_min);
   st->print('/');
   st->println(servo_max);
   // other settings
-  st->print(F("  > Servo hold time (ms) = "));
-  st->println(servo_hold_time);
   st->print(F(" >> Stepper random movement min/max (micro-steps) = "));
   st->print(stepper_randomsteps_min);
   st->print('/');
   st->println(stepper_randomsteps_max);
-  st->print(F("  > Stepper steps while seeking (full steps) = "));
-  st->println(stepper_stepsWhileSeeking);
-  /* // no longer using real-time clock
-  st->print(F(" >> Sleep/wake control = "));
-  st->println(rtc_control? F("clock") : F("sensor"));
-  st->print(F("  > Sleep time (24h hours:minutes) = "));
-  st->print(rtc_sleep/60);
-  st->print(':');
-  st->println(rtc_sleep%60);
-  st->print(F("  > Wake time (24h hours:minutes) = "));
-  st->print(rtc_wake/60);
-  st->print(':');
-  st->println(rtc_wake%60);
-  */
+  st->print(F("  > Stepper reverse percent = "));
+  st->println(stepper_reverse_percent);
+  st->print(F("  > Servo hold time (ms) = "));
+  st->println(servo_hold_time);
   st->print(F("  > Light sensor threshold (10-bit DAC value) = "));
   st->println(light_sensor_threshold);
   st->println();  

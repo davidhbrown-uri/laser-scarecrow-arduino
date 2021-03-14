@@ -21,19 +21,13 @@
   back on, we can start the duty cycle clock back at 30 seconds
   without endangering the laser diode.
 */
-#ifndef _LASERCONTROLLER_h
-#define _LASERCONTROLLER_h
-
-#if defined(ARDUINO) && ARDUINO >= 100
+#pragma once
 #include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-
-// for testing, a rapid duty cycle: 30sec on, 5sec off
+#include "config.h"
+// for testing, a rapid duty cycle: 20sec on, 30sec off
 #ifdef DEBUG_LASER_DUTY_CYCLE
-#define LASERCONTROLLER_DEFAULTDUTYCYCLERUNTIME 30000
-#define LASERCONTROLLER_DEFAULTDUTYCYCLECOOLDOWN 5000
+#define LASERCONTROLLER_DEFAULTDUTYCYCLERUNTIME 20000
+#define LASERCONTROLLER_DEFAULTDUTYCYCLECOOLDOWN 30000
 #else
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
 #define LASERCONTROLLER_DEFAULTDUTYCYCLERUNTIME 1800000
@@ -71,5 +65,3 @@ class LaserController {
     static unsigned long _dutyCycleMaxRuntime;
     static unsigned long _dutyCycleMinCooldown;
 };
-
-#endif

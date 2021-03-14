@@ -43,7 +43,7 @@
 #include "config.h"
 #include "ServoController.h"
 #include "AmbientLightSensor.h"
-#include "Interrupt.h"
+#include "StepperController.h"
 
 // https://github.com/bakercp/CRC32
 #include <CRC32.h>
