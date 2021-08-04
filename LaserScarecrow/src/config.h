@@ -113,11 +113,11 @@
 // LASER
 //======
 // duty cycle 30min on, 5min off (example from 50mW wide-beam green Laser Module)
-//#define LASER_DUTYCYCLERUNTIME 1800000
-//#define LASER_DUTYCYCLECOOLDOWN 300000
+#define LASER_DUTYCYCLERUNTIME 1800000
+#define LASER_DUTYCYCLECOOLDOWN 300000
 // for testing: 10sec duty; 30sec cooldown
-#define LASER_DUTYCYCLERUNTIME 10000
-#define LASER_DUTYCYCLECOOLDOWN 30000
+// #define LASER_DUTYCYCLERUNTIME 10000
+// #define LASER_DUTYCYCLECOOLDOWN 30000
 //=====
 //SERVO
 //=====
